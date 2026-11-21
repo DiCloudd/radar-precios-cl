@@ -55,6 +55,9 @@ class Monitor:
         self.hunting = hunting                  # modo caza solo en el modo 24/7 (necesita seguir vivo)
         self.hunts: set[asyncio.Task] = set()
         self.fast_count = 0                     # para rotar fuentes con fast_every > 1
+        self.crawling = False                   # True si el rastreador de catálogo completo está activo
+        from crawler import crawl_sources
+        self._crawled = {s for srcs in crawl_sources(config.SOURCES).values() for s in srcs}
 
     async def aclose(self) -> None:
         for t in list(self.hunts):              # fin de ventana: cierra las cazas (quedan como "seguía activo")
@@ -131,6 +134,8 @@ class Monitor:
                     continue
                 if mode == "fast" and (not src.fast or self.fast_count % src.fast_every):
                     continue                                  # solo profundo, o le toca en otro ciclo rápido
+                if mode == "deep" and self.crawling and src in self._crawled:
+                    continue                                  # el rastreador ya recorre todas sus páginas
                 pause = self._paused(store, src)
                 if pause:
                     skipped.append(ScrapeResult(src, skipped=pause))
@@ -149,17 +154,8 @@ class Monitor:
                 for a in (self._update_breaker(store, res, ts), self._layout_watch(store, res, mode)):
                     if a:
                         system_alerts.append(a)
-                seen = set()
-                cat = res.source.category
-                for p in res.products:
-                    seen.add(p.key)
-                    gk = group_key(p.name, p.brand, cat)
-                    if is_accessory(p.name, cat):              # una correa no se compara con el reloj
-                        gk = f"accesorio: {gk}"
-                    obs = store.observe(p, gk, res.source.name, ts, cat)
-                    if not warming:
-                        report.alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets),
-                                                      targets, cat))
+                seen = {p.key for p in res.products}
+                report.alerts.extend(self.ingest(store, res.source, res.products, ts, warming, targets))
                 # desaparecidos: solo si se recorrió la categoría completa (si no, es ruido de paginación)
                 if mode == "deep" and res.ok and res.full_coverage:
                     for row in store.mark_missing(res.source.name, seen, ts):
@@ -171,24 +167,43 @@ class Monitor:
                     system_alerts.append(Alert("missing", None, "👻 Producto vigilado no disponible",
                                                [res.source.name, res.error or "", res.source.url], 3))
             store.commit()
-
-            # deduplicar con enfriamiento
-            fresh = []
-            for a in sorted(report.alerts + system_alerts, key=lambda a: a.priority):
-                dedupe_key = a.key or a.title
-                if store.alerted_recently(dedupe_key, a.kind, a.price, config.ALERT_COOLDOWN_HOURS):
-                    continue
-                if a.kind not in ("godzilla", "price_error") and userprefs.is_muted(store, a.key):
-                    continue                                   # 🔕 silenciado desde Telegram
-                fake = fake_discount(a.obs, store) if a.obs else None
-                text = format_alert(a, SITE_LABELS, fake)
-                store.add_alert(dedupe_key, a.kind, a.price, text, ts)
-                fresh.append((a, text))
-            store.commit()
-            report.alerts = [a for a, _ in fresh]
-            await self._notify(fresh, report, store)
+            report.alerts = await self.dispatch(store, report.alerts + system_alerts, ts, report)
         report.duration = time.monotonic() - started
         return report
+
+    # ------------------------------------------------------------------ procesamiento compartido (ciclos + rastreador)
+    def ingest(self, store: PriceStore, src: config.Source, products: list, ts: str, warming: bool,
+               targets: list, quiet_new: bool = False) -> list[Alert]:
+        """Guarda los productos y devuelve las alertas que generan. Sin awaits: la transacción no cruza esperas.
+        quiet_new: no alertar productos nunca vistos (1er barrido del rastreador)."""
+        alerts: list[Alert] = []
+        cat = src.category
+        for p in products:
+            gk = group_key(p.name, p.brand, cat)
+            if is_accessory(p.name, cat):              # una correa no se compara con el reloj
+                gk = f"accesorio: {gk}"
+            obs = store.observe(p, gk, src.name, ts, cat)
+            if not warming and not (quiet_new and obs.is_new):
+                alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets), targets, cat))
+        return alerts
+
+    async def dispatch(self, store: PriceStore, alerts: list[Alert], ts: str, report: CycleReport | None = None) -> list[Alert]:
+        """Deduplica (enfriamiento + silencios), registra y notifica. Devuelve las alertas efectivamente nuevas."""
+        fresh = []
+        for a in sorted(alerts, key=lambda a: a.priority):
+            dedupe_key = a.key or a.title
+            if store.alerted_recently(dedupe_key, a.kind, a.price, config.ALERT_COOLDOWN_HOURS):
+                continue
+            if a.kind not in ("godzilla", "price_error") and userprefs.is_muted(store, a.key):
+                continue                                   # 🔕 silenciado desde Telegram
+            fake = fake_discount(a.obs, store) if a.obs else None
+            text = format_alert(a, SITE_LABELS, fake)
+            store.add_alert(dedupe_key, a.kind, a.price, text, ts)
+            fresh.append((a, text))
+        store.commit()
+        if fresh:
+            await self._notify(fresh, report or CycleReport("crawl"), store)
+        return [a for a, _ in fresh]
 
     async def _notify(self, fresh: list[tuple[Alert, str]], report: CycleReport, store: PriceStore) -> None:
         def row_of(a: Alert):

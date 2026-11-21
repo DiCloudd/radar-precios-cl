@@ -8,6 +8,8 @@
 #     fast       true = también en el ciclo rápido (~2 min, solo página 1); false = solo escaneo profundo (~13 min)
 #     enabled    false para desactivarla sin borrarla
 #
+#  🆕 = recién publicados (orden "nuevos productos"). 🔄 Además, el rastreador recorre TODAS las páginas
+#       de cada fuente normal, sin parar (crawler.py), así que nada queda fuera.
 #  ⚡ = "trampa de errores": el listado ordenado de MENOR a MAYOR precio. Un error de precio
 #       (PS5 a $49.990) salta a la página 1, así que se detecta en ~2 min aunque la tienda tenga
 #       miles de productos. Los listados normales (orden de la tienda) alimentan el historial.
@@ -669,6 +671,83 @@ category = "electro"
 url = "https://www.hites.com/electro-hogar/lavado-y-secado/lavadoras/"
 max_pages = 2
 fast = false
+
+
+
+# ============================== 🆕 RECIÉN PUBLICADOS (Falabella) =================
+# Muchos errores nacen al subir un producto nuevo con el precio mal puesto. Falabella ordena por "Nuevos productos".
+
+[[source]]
+name = "Falabella · Smartphones 🆕"
+site = "falabella"
+category = "celulares"
+url = "https://www.falabella.com/falabella-cl/category/cat720161/Smartphones?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Notebooks 🆕"
+site = "falabella"
+category = "notebooks"
+url = "https://www.falabella.com/falabella-cl/category/cat70057/Notebooks?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Televisores 🆕"
+site = "falabella"
+category = "televisores"
+url = "https://www.falabella.com/falabella-cl/category/cat7190148/Televisores-LED?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Consolas 🆕"
+site = "falabella"
+category = "consolas"
+url = "https://www.falabella.com/falabella-cl/category/cat202303/Consolas?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Tablets 🆕"
+site = "falabella"
+category = "tablets"
+url = "https://www.falabella.com/falabella-cl/category/cat7230007/Tablets?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Audífonos 🆕"
+site = "falabella"
+category = "audifonos"
+url = "https://www.falabella.com/falabella-cl/category/cat1640002/Audifonos?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Smartwatches 🆕"
+site = "falabella"
+category = "smartwatches"
+url = "https://www.falabella.com/falabella-cl/category/cat4290063/Smartwatch?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Refrigeradores 🆕"
+site = "falabella"
+category = "electro"
+url = "https://www.falabella.com/falabella-cl/category/cat3205/Refrigeradores?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Lavadoras 🆕"
+site = "falabella"
+category = "electro"
+url = "https://www.falabella.com/falabella-cl/category/cat4060/Lavadoras?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
+max_pages = 1
+fast_every = 2
 
 
 # ============================================================================

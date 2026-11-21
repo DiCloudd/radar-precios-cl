@@ -48,8 +48,9 @@ def build_data(store: PriceStore) -> dict:
             "missing": r["missing_since"], "min": min(prices), "max": max(prices),
             "ch24": round((r["price"] / old - 1) * 100, 1) if old else None,
             "atMin": r["price"] <= min(prices) and len(hist) > 1,
-            "hist": [[ts[:16], p] for ts, p in hist][-120:],
-            "pred": predict(hist), "fake": fake_discount(obs, store),
+            "hist": [[ts[:16], p] for ts, p in hist][-40:] if len(hist) > 1 else [],   # compacto: miles de productos
+            "pred": predict(hist) if len(hist) >= 4 else None,
+            "fake": fake_discount(obs, store) if prod.list_price else None,
         })
     groups: dict[str, list] = {}
     for p in products:
@@ -79,7 +80,7 @@ def build_data(store: PriceStore) -> dict:
         block = store.get_meta(f"block:{src.site}") or {}
         day = [r for r in runs if r["ts"] >= since24]
         stores.append({
-            "site": src.site, "name": src.name, "cat": src.category, "trap": "⚡" in src.name, "label": SITE_LABELS.get(src.site, src.site), "url": src.url,
+            "site": src.site, "name": src.name, "cat": src.category, "trap": any(m in src.name for m in ("⚡", "🆕")), "label": SITE_LABELS.get(src.site, src.site), "url": src.url,
             "lastTs": last["ts"] if last else None, "ok": bool(last["ok"]) if last else None,
             "n": last["n"] if last else 0, "method": last["method"] if last else None,
             "fallback": bool(last["fallback"]) if last else False, "error": last["error"] if last else None,
@@ -87,6 +88,7 @@ def build_data(store: PriceStore) -> dict:
             "strikes": block.get("strikes", 0), "uptime24": round(sum(r["ok"] for r in day) / len(day) * 100) if day else None,
             "avgSec": round(statistics.mean(r["duration"] for r in day), 1) if day else None,
             "products": sum(1 for p in products if p["site"] == src.site and not p["missing"]),
+            "sweep": store.get_meta(f"sweep:{src.name}"), "crawlPage": (store.get_meta(f"crawl:{src.name}") or {}).get("page"),
         })
     # 🏆 salón de la fama: errores de precio detectados, cuánto duraron y cuánto ahorraban
     errors = []
@@ -133,7 +135,9 @@ def build_data(store: PriceStore) -> dict:
         "totals": {"products": len(products), "active": sum(1 for p in products if not p["missing"]),
                    "drops24": sum(1 for p in products if p["ch24"] and p["ch24"] < 0),
                    "godzillas": sum(1 for a in alerts if a["kind"] in ("godzilla", "price_error")),
-                   "fakes": sum(1 for p in products if p["fake"]), "comparisons": len(comparisons)},
+                   "fakes": sum(1 for p in products if p["fake"]), "comparisons": len(comparisons),
+                   "fresh60": sum(1 for p in products if not p["missing"] and p["last"] >= ago(minutes=60)),
+                   "fresh24": sum(1 for p in products if not p["missing"] and p["last"] >= ago(hours=24))},
     }
 
 

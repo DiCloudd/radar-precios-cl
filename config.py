@@ -61,6 +61,7 @@ MAX_RETRIES = int(os.getenv("MAX_RETRIES", "4"))
 HTTP_TIMEOUT = _float("HTTP_TIMEOUT", 30)
 PAGE_TIMEOUT_MS = int(os.getenv("PAGE_TIMEOUT_MS", "60000"))
 RESPECT_ROBOTS = _bool("RESPECT_ROBOTS", True)
+CRAWL = _bool("CRAWL", True)                          # 🔄 rastreador de catálogo completo (modo 24/7)
 BROWSER_FALLBACK = _bool("BROWSER_FALLBACK", True)    # usar Playwright si falla la vía HTTP
 HEADLESS = _bool("HEADLESS", True)
 PROXY_URL = os.getenv("PROXY_URL", "").strip() or None

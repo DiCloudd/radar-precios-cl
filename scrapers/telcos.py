@@ -26,10 +26,10 @@ def _first(attrs: dict, *keys: str):
 
 class EntelScraper(Scraper):
     site, label = "entel", "Entel"
-    PAGE = 24
+    PAGE = 96               # verificado: Endeca acepta Nrpp=96
 
     def page_url(self, base_url: str, n: int) -> str | None:
-        return base_url if n == 1 else with_query(base_url, No=(n - 1) * self.PAGE, Nrpp=self.PAGE)
+        return with_query(base_url, No=(n - 1) * self.PAGE, Nrpp=self.PAGE)
 
     def parse(self, text: str, url: str) -> PageResult:
         dec = json.JSONDecoder()

@@ -244,7 +244,8 @@ function kpis() {
   const t = D.totals, ok = D.stores.filter(s => s.ok).length;
   $("#kpis").innerHTML = [
     [t.active, "productos vigilados"], [t.drops24, "bajaron en 24 h"], [t.godzillas, "🦖 alertas Godzilla"],
-    [t.comparisons, "modelos comparables"], [t.fakes, "🤡 ofertas sospechosas"], [`${ok}/${D.stores.length}`, "tiendas OK"]
+    [t.comparisons, "modelos comparables"], [t.fakes, "🤡 ofertas sospechosas"], [`${ok}/${D.stores.length}`, "fuentes OK"],
+    [t.fresh60 != null ? Math.round(t.fresh60 / Math.max(t.active, 1) * 100) + "%" : "–", "🔄 revisado en la última hora"]
   ].map(([v, l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
   const gz = D.alerts.find(a => a.kind === "godzilla" || a.kind === "price_error");
   if (gz && Date.now() - new Date(gz.ts) < 864e5) { $("#gz").style.display = "flex"; $("#gzmsg").innerHTML = safeHTML(gz.message).replace(/\n/g, "<br>"); }
@@ -337,10 +338,12 @@ const views = {
       : `<div class="empty">Sin alertas todavía.</div>`;
   },
   stores() {
-    return `<div class="tablewrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Productos</th><th>Uptime 24 h</th><th>Duración</th><th>Método</th><th>Última revisión</th></tr></thead><tbody>${
+    return `<div class="tablewrap"><table><thead><tr><th>Fuente</th><th>Estado</th><th>Productos</th><th>🔄 Barrido completo</th><th>Uptime 24 h</th><th>Método</th><th>Última revisión</th></tr></thead><tbody>${
       D.stores.map(s => `<tr><td><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a></td>
         <td>${s.blocked ? `<span class="wa">⏸ pausada (bloqueo ×${s.strikes})</span>` : s.ok ? `<span class="ok">● OK</span>${s.fallback ? ' <span class="wa">(respaldo)</span>' : ""}` : s.ok === false ? `<span class="ko" title="${esc(s.error)}">● error</span>` : "–"}</td>
-        <td class="num">${s.products}</td><td class="num">${s.uptime24 != null ? s.uptime24 + "%" : "–"}</td><td class="num">${s.avgSec != null ? s.avgSec + " s" : "–"}</td>
+        <td class="num">${s.products}</td>
+        <td class="sub">${s.sweep ? `✅ ${ago(s.sweep.done)} · ${s.sweep.pages} pág. en ${s.sweep.minutes} min` : s.crawlPage ? `🔄 recorriendo pág. ${s.crawlPage}…` : (s.trap ? "⚡ trampa (pág. 1)" : "–")}</td>
+        <td class="num">${s.uptime24 != null ? s.uptime24 + "%" : "–"}</td>
         <td class="sub">${esc(s.method || s.error || "")}</td><td class="sub">${ago(s.lastTs)}</td></tr>`).join("")}</tbody></table></div>`;
   },
   events() {

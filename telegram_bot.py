@@ -296,19 +296,30 @@ class TelegramBot:
 
     async def cmd_estado(self, store, chat, arg):
         import time as _t
-        lines = ["🩺 <b>Estado de las tiendas</b>"]
+        from datetime import datetime as _dt
+        by_site: dict[str, list] = {}
         for src in config.SOURCES:
-            run = store.recent_runs(src.name, 1)
-            block = store.get_meta(f"block:{src.site}") or {}
+            by_site.setdefault(src.site, []).append(src)
+        lines = ["🩺 <b>Estado y cobertura</b>"]
+        for site, srcs in by_site.items():
+            block = store.get_meta(f"block:{site}") or {}
             if block.get("until", 0) > _t.time():
-                st = f"⏸️ pausada (bloqueo ×{block.get('strikes')})"
-            elif not run:
-                st = "– sin datos"
-            else:
-                st = f"✅ {run[0]['n']} prod." if run[0]["ok"] else f"❌ {html.escape((run[0]['error'] or '')[:60])}"
-            lines.append(f"• {SITE_LABELS.get(src.site)}: {st}")
+                lines.append(f"⏸️ {SITE_LABELS.get(site)}: pausada por bloqueo (×{block.get('strikes')})")
+                continue
+            ok = sum(1 for s_ in srcs if (r := store.recent_runs(s_.name, 1)) and r[0]["ok"])
+            sweeps = [store.get_meta(f"sweep:{s_.name}") for s_ in srcs]
+            done = [_dt.fromisoformat(w["done"]) for w in sweeps if w]
+            cov = ""
+            if done:
+                oldest = (_dt.now() - min(done)).total_seconds() / 60
+                cov = f" · 🔄 todo revisado hace ≤{oldest:.0f} min"
+            n = store.conn.execute("SELECT COUNT(*) FROM products WHERE site=? AND missing_since IS NULL", (site,)).fetchone()[0]
+            lines.append(f"{'✅' if ok else '❔'} {SITE_LABELS.get(site)}: {n} prod.{cov}")
         total = store.conn.execute("SELECT COUNT(*) FROM products WHERE missing_since IS NULL").fetchone()[0]
-        lines.append(f"\n📦 {total} productos · 🌐 {config.PUBLIC_SITE_URL or 'dashboard local'}")
+        fresh = store.conn.execute("SELECT COUNT(*) FROM products WHERE missing_since IS NULL AND last_seen>=?",
+                                   (ago(minutes=60),)).fetchone()[0]
+        lines.append(f"\n📦 {total} productos · {fresh} revisados en la última hora ({fresh / max(total, 1) * 100:.0f}%)")
+        lines.append(f"🌐 {config.PUBLIC_SITE_URL or 'dashboard local'}")
         await self.reply(chat, "\n".join(lines))
 
     async def cmd_resumen(self, store, chat, arg):

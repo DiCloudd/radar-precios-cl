@@ -15,13 +15,16 @@ PAGE_SIZE = 36
 
 
 class _SFCC(Scraper):
+    page_size = PAGE_SIZE
+
     def page_url(self, base_url: str, n: int) -> str | None:
-        return with_query(base_url, start=(n - 1) * PAGE_SIZE, sz=PAGE_SIZE)
+        return with_query(base_url, start=(n - 1) * self.page_size, sz=self.page_size)
 
 
 class AbcScraper(_SFCC):
     """Tarjetas .product-tile__wrapper[data-pid] con precios .la-polar / .internet / .normal [data-value]."""
     site, label = "abc", "Abc (La Polar)"
+    page_size = 96          # verificado: Abc acepta sz=96 (menos peticiones para el barrido completo)
 
     def parse(self, text: str, url: str) -> PageResult:
         out = []

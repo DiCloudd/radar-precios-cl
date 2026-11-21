@@ -111,6 +111,10 @@ async def run_loop(args) -> None:
     from telegram_bot import TelegramBot
     bot, bot_stop = TelegramBot(), asyncio.Event()
     bot_task = asyncio.create_task(bot.run(bot_stop)) if bot.enabled else None   # 🤖 responde en paralelo
+    from crawler import Crawler
+    crawler = Crawler(mon)
+    crawl_task = asyncio.create_task(crawler.run(bot_stop)) if config.CRAWL else None   # 🔄 catálogo completo
+    mon.crawling = crawl_task is not None              # el 1er escaneo profundo ya no repite lo que rastrea
     log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)
     try:
         while not stop.is_set():
@@ -147,9 +151,11 @@ async def run_loop(args) -> None:
                 pass
     finally:
         bot_stop.set()
-        if bot_task:
-            bot_task.cancel()
-            await asyncio.gather(bot_task, return_exceptions=True)
+        for t in (bot_task, crawl_task):
+            if t:
+                t.cancel()
+        await asyncio.gather(*(t for t in (bot_task, crawl_task) if t), return_exceptions=True)
+        log.info("🔄 Rastreador: %d páginas, %d productos en esta ventana", crawler.pages_done, crawler.products_seen)
         await bot.aclose()
         await mon.aclose()
         if dirty:                      # nunca terminar con datos sin publicar (en Actions se perderían)
