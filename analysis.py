@@ -118,6 +118,16 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
             reason = too_cheap(p.name, category, p.price)
             if reason:
                 alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?", [reason], 0, p.list_price or obs.previous))
+    # 💳 el error puede estar solo en el precio con tarjeta de la tienda (CMR, La Polar, Hites, Paris)
+    card_new = p.card_price and (obs.previous_card is None or p.card_price < obs.previous_card)
+    if card_new and not any(a.kind == "price_error" for a in alerts):
+        ref = p.list_price or p.price
+        disc = (1 - p.card_price / ref) * 100 if ref else 0
+        reason = too_cheap(p.name, category, p.card_price)
+        if (ref >= config.ERROR_MIN_LIST and disc >= config.ERROR_DISCOUNT_PCT and not is_accessory(p.name, category)) or reason:
+            alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO CON TARJETA?",
+                                [f"💳 {clp(p.card_price)} pagando con la tarjeta de la tienda (-{disc:.0f}% vs {clp(ref)})"],
+                                0, ref))
 
     # 🦖 GODZILLA: caída brutal vs el máximo de las últimas 24 h
     if not obs.is_new:
@@ -154,6 +164,11 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
         alerts.append(Alert("drop", obs, "📉 Bajó de precio", [], 3))
     elif obs.direction == "up" and config.NOTIFY_ON_RISE and abs(obs.pct) >= config.MIN_CHANGE_PCT:
         alerts.append(Alert("rise", obs, "📈 Subió de precio", [], 6))
+    elif (obs.previous_card and p.card_price and p.card_price < obs.previous_card
+          and (1 - p.card_price / obs.previous_card) * 100 >= config.MIN_CHANGE_PCT):
+        pct = (1 - p.card_price / obs.previous_card) * 100
+        alerts.append(Alert("card_drop", obs, "💳 Bajó con tarjeta",
+                            [f"💳 {clp(p.card_price)} con tarjeta de la tienda (antes {clp(obs.previous_card)}, -{pct:.0f}%)"], 3))
 
     if watched and obs.was_in_stock is not None and p.in_stock is not None and obs.was_in_stock != p.in_stock:
         alerts.append(Alert("stock_back" if p.in_stock else "stock_out", obs,

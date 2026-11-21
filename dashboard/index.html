@@ -170,7 +170,8 @@ const clp = n => n == null ? "–" : "$" + Math.round(n).toLocaleString("es-CL")
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const ago = iso => { if(!iso) return "nunca"; const m = (Date.now() - new Date(iso)) / 60000;
   return m < 1 ? "hace segundos" : m < 60 ? `hace ${Math.round(m)} min` : m < 1440 ? `hace ${Math.round(m/60)} h` : `hace ${Math.round(m/1440)} d`; };
-const state = { tab: "deals", q: "", sort: "ch24", stores: new Set(), page: 0, cat: "all" };
+const state = { tab: "deals", q: "", sort: "ch24", stores: new Set(), page: 0, cat: "all", card: false };
+try { state.card = localStorage.getItem("card") === "1"; } catch (e) {}
 try { state.cat = localStorage.getItem("cat") || "all"; } catch (e) {}
 let D = null, chart = null;
 
@@ -290,14 +291,22 @@ const views = {
   },
   compare() {
     const q = state.q.trim().toLowerCase();
-    const list = D.comparisons.filter(c => (!q || c.group.includes(q)) && (state.cat === "all" || c.cat === state.cat));
-    if (!list.length) return `<div class="empty">No hay modelos repetidos entre tiendas con ese filtro.</div>`;
-    const note = `<p class="sub">🏪 = vendedor externo del marketplace (no la tienda): revisa si es nuevo, reacondicionado o usado.</p>`;
+    const eff = i => state.card && i.card ? Math.min(i.price, i.card) : i.price;
+    const list = D.comparisons.filter(c => (!q || c.group.includes(q)) && (state.cat === "all" || c.cat === state.cat))
+      .map(c => { const items = [...c.items].sort((a, b) => eff(a) - eff(b));
+                  return { ...c, items, spread: eff(items.at(-1)) - eff(items[0]) }; })
+      .sort((a, b) => b.spread - a.spread);
+    const toggle = `<label class="chip ${state.card ? "on" : ""}" style="cursor:pointer;display:inline-flex;gap:6px;align-items:center">
+      <input type="checkbox" id="cardtoggle" ${state.card ? "checked" : ""} style="margin:0"> 💳 Considerar precio con tarjeta de la tienda (CMR, La Polar, Hites…)</label>`;
+    const note = `<p class="sub">${toggle}<br>🏪 = vendedor externo del marketplace (no la tienda): revisa si es nuevo, reacondicionado o usado.</p>`;
+    if (!list.length) return note + `<div class="empty">No hay modelos repetidos entre tiendas con ese filtro.</div>`;
     return note + list.slice(0, 80).map(c => {
       const max = Math.max(...c.items.map(i => i.price));
-      return `<div class="cmp"><h4>${esc(c.group)} <span class="tag down">ahorras ${clp(c.spread)}</span></h4>${c.items.map((i, n) =>
-        `<div class="bar ${n === 0 ? "best" : ""}"><span>${n === 0 ? "🥇 " : ""}${esc(i.store)}${i.seller ? `<br><small class="sub" title="Vendedor externo del marketplace: puede ser reacondicionado o usado aunque no lo diga">🏪 ${esc(i.seller)}</small>` : ""}</span><div class="track"><div class="fill" style="width:${(i.price / max * 100).toFixed(1)}%"></div></div>
-         <a class="p" href="${esc(i.url)}" target="_blank" rel="noopener">${clp(i.price)}</a></div>`).join("")}</div>`;
+      return `<div class="cmp"><h4>${esc(c.group)} <span class="tag down">ahorras ${clp(c.spread)}</span></h4>${c.items.map((i, n) => {
+        const cardTxt = i.card && i.card < i.price ? `<br><small class="sub">💳 ${clp(i.card)} con tarjeta</small>` : "";
+        return `<div class="bar ${n === 0 ? "best" : ""}"><span>${n === 0 ? "🥇 " : ""}${esc(i.store)}${i.seller ? `<br><small class="sub" title="Vendedor externo del marketplace: puede ser reacondicionado o usado aunque no lo diga">🏪 ${esc(i.seller)}</small>` : ""}</span>
+         <div class="track"><div class="fill" style="width:${(eff(i) / max * 100).toFixed(1)}%"></div></div>
+         <a class="p" href="${esc(i.url)}" target="_blank" rel="noopener">${clp(eff(i))}${state.card && i.card && i.card < i.price ? " 💳" : ""}${!state.card ? cardTxt : ""}</a></div>`; }).join("")}</div>`;
     }).join("");
   },
   fake() {
@@ -367,6 +376,8 @@ function render() {
   $("#view").innerHTML = views[state.tab]();
   $("#view").querySelectorAll("[data-k]").forEach(el => el.onclick = () => openProduct(el.dataset.k));
   $("#prev")?.addEventListener("click", () => { state.page = Math.max(0, state.page - 1); render(); });
+  $("#cardtoggle")?.addEventListener("change", e => { state.card = e.target.checked;
+    try { localStorage.setItem("card", state.card ? "1" : "0"); } catch (err) {} render(); });
   $("#next")?.addEventListener("click", () => { state.page++; render(); });
 }
 

@@ -229,3 +229,22 @@ def test_stock_any_variant():
     assert ld_in_stock({"offers": [{"availability": "https://schema.org/OutOfStock"}]}) is False
     assert ld_in_stock({"offers": []}) is None
     assert ld_in_stock({"offers": {"availability": "https://schema.org/inStock"}}) is True   # Samsung
+
+
+# ---------------------------------------------------------------- 💳 precio con tarjeta (caso Midea en Abc)
+def test_card_price_drop_alert(db):
+    with PriceStore(db) as s:
+        s.observe(Product("abc:1", "abc", "Refrigerador Midea MDRS710FGE50IN", "https://a.cl/1", 699990, None, 499990),
+                  "g", "src", "2026-11-21T08:00:00", "electro")
+        obs = s.observe(Product("abc:1", "abc", "Refrigerador Midea MDRS710FGE50IN", "https://a.cl/1", 699990, None, 413991),
+                        "g", "src", "2026-11-21T09:00:00", "electro")
+        kinds = [a.kind for a in evaluate(obs, s, watched=False, category="electro")]
+    assert kinds == ["card_drop"]                              # el precio público no cambió, el de tarjeta sí
+
+
+def test_card_only_price_error(db):
+    with PriceStore(db) as s:
+        obs = s.observe(Product("hites:7", "hites", "Consola PlayStation 5 Slim", "https://h.cl/7", 549990, 599990, 49990),
+                        "g", "src", "2026-11-21T09:00:00", "consolas")
+        alerts = evaluate(obs, s, watched=False, category="consolas")
+    assert [a.title for a in alerts] == ["💥 ¿ERROR DE PRECIO CON TARJETA?"]

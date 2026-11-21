@@ -63,6 +63,7 @@ class Observation:
     first_seen: str                 # ISO
     was_in_stock: bool | None
     was_missing: bool
+    previous_card: int | None = None  # precio con tarjeta anterior
 
     @property
     def is_new(self) -> bool:
@@ -112,7 +113,7 @@ class PriceStore:
             p, row["price"] if row else None, row["list_price"] if row else None, hmin,
             row["first_seen"] if row else ts,
             None if not row or row["in_stock"] is None else bool(row["in_stock"]),
-            bool(row and row["missing_since"]))
+            bool(row and row["missing_since"]), row["card_price"] if row else None)
         changed = (not row or row["price"] != p.price or row["list_price"] != p.list_price
                    or row["card_price"] != p.card_price)
         c.execute(

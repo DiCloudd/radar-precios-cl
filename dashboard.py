@@ -68,7 +68,7 @@ def build_data(store: PriceStore) -> dict:
             continue
         comparisons.append({"group": g, "cat": items[0]["cat"], "best": items[0]["key"], "spread": items[-1]["price"] - items[0]["price"],
                             "median": statistics.median(i["price"] for i in items),
-                            "items": [{"key": i["key"], "store": i["store"], "price": i["price"], "url": i["url"],
+                            "items": [{"key": i["key"], "store": i["store"], "price": i["price"], "url": i["url"], "card": i["card"],
                                        "seller": next((b.split(": ", 1)[1].strip() for b in i["badges"] if b.startswith("Vendedor: ")), None)}
                                       for i in items]})
     comparisons.sort(key=lambda c: -c["spread"])
