@@ -1,6 +1,7 @@
 # Monitor en la nube, gratis (repo público). Cada ejecución es una "ventana" de ~12 min:
 # 1 ciclo profundo + ciclos rápidos cada ~2 min, publicando el dashboard cada 5 min.
-# GitHub lanza una ventana cada 15 min (a veces con retraso) -> cobertura casi continua.
+# Cada ventana que termina bien lanza la siguiente (encadenado). El cron de 15 min es el respaldo que
+# reinicia la cadena si algo falla. Interruptor general: variable de repo MONITOR_ON_ACTIONS = false.
 name: monitor
 on:
   schedule:
@@ -12,7 +13,8 @@ on:
         default: "12"
 
 permissions:
-  contents: write
+  contents: write     # publicar el dashboard en gh-pages
+  actions: write      # encadenar la siguiente ventana
 
 concurrency:
   group: monitor
@@ -53,3 +55,7 @@ jobs:
 
       - name: Ventana de monitoreo
         run: python main.py --loop --duration "${{ inputs.minutes || '12' }}"
+
+      - name: Encadenar la siguiente ventana
+        if: success()
+        run: gh workflow run monitor.yml --ref "${{ github.ref_name }}"
