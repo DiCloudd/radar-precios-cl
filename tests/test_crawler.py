@@ -105,3 +105,28 @@ async def test_block_pauses_store_and_keeps_cursor(mon):
     assert meta("block:falabella")["strikes"] == 1 and meta(f"crawl:{SRC.name}") is None
     with PriceStore(config.DB_PATH) as s:
         assert mon._paused(s, SRC)                          # el trabajador dejará de pedirle a la tienda
+
+
+@pytest.mark.asyncio
+async def test_sponsored_item_on_every_page_does_not_end_sweep(mon):
+    # Falabella: el mismo producto patrocinado (id 99) encabeza TODAS las páginas; no es el fin del catálogo
+    FakeScraper.pages = {n: [(99, 300000, None)] + [(n * 10 + i, 500000, None) for i in range(5)] for n in (1, 2, 3)}
+    cr = C.Crawler(mon)
+    for _ in range(3):
+        await cr._step(SRC)
+    assert meta(f"sweep:{SRC.name}") is None and meta(f"crawl:{SRC.name}")["page"] == 4
+    await cr._step(SRC)                                     # pág 4 vacía -> ahora sí termina
+    assert meta(f"sweep:{SRC.name}")["pages"] == 3
+
+
+@pytest.mark.asyncio
+async def test_crawler_yields_to_fast_cycles(mon):
+    import asyncio
+    mon.cycle_busy = True
+    FakeScraper.pages = {1: [(1, 500000, None)]}
+    stop = asyncio.Event()
+    task = asyncio.create_task(C.Crawler(mon)._worker("f.cl", [SRC], stop))
+    await asyncio.sleep(0.3)
+    assert meta(f"crawl:{SRC.name}") is None                # no avanzó mientras el ciclo estaba ocupado
+    stop.set()
+    await task

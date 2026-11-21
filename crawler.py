@@ -63,6 +63,8 @@ class Crawler:
             for src in sources:
                 if stop.is_set():
                     return
+                while getattr(self.mon, "cycle_busy", False) and not stop.is_set():   # ⚡ ciclos rápidos primero
+                    await asyncio.sleep(1)
                 with PriceStore(config.DB_PATH) as store:
                     if self.mon._paused(store, src):
                         continue
@@ -84,7 +86,7 @@ class Crawler:
         """Lee la siguiente página de la fuente, procesa y avanza el cursor."""
         scraper = SCRAPERS[src.site]()
         with PriceStore(config.DB_PATH) as store:
-            cur = store.get_meta(f"crawl:{src.name}") or {"page": 1, "started": now_iso(), "first_key": None}
+            cur = store.get_meta(f"crawl:{src.name}") or {"page": 1, "started": now_iso(), "prev_keys": []}
         page = cur["page"]
         url = scraper.page_url(src.url, page)
         if url is None:
@@ -108,8 +110,12 @@ class Crawler:
         products = res.products if res else []
         for p in products:
             p.found_at = url
-        first_key = products[0].key if products else None
-        last_page = (not products and res is not None) or (page > 1 and first_key == cur.get("prev_first")) \
+        keys = [p.key for p in products]
+        # ¿la tienda repitió la página anterior? (fin del catálogo). Se compara la página COMPLETA: Falabella pone
+        # productos patrocinados arriba de todas las páginas, así que el primero puede repetirse sin ser el final.
+        prev = set(cur.get("prev_keys") or [])
+        repeated = page > 1 and bool(keys) and len(prev & set(keys)) >= 0.8 * len(keys)
+        last_page = (not products and res is not None) or repeated \
             or (res is not None and res.total_pages and page >= res.total_pages) or page >= MAX_PAGES_PER_SOURCE
         ts = now_iso()
         with PriceStore(config.DB_PATH) as store:
@@ -117,18 +123,18 @@ class Crawler:
             targets = userprefs.all_targets(store)
             # 1er barrido completo: los productos nunca vistos solo se registran (sin alertas)
             alerts = self.mon.ingest(store, src, products, ts, warming=False, targets=targets,
-                                     quiet_new=sweep is None) if products and first_key != cur.get("prev_first") else []
+                                     quiet_new=sweep is None) if products and not repeated else []
             store.commit()
             if last_page:
                 started = datetime.fromisoformat(cur.get("started") or ts)
                 minutes = (datetime.now() - started).total_seconds() / 60
                 store.set_meta(f"sweep:{src.name}", {"done": ts, "pages": page if products else page - 1,
                                                      "minutes": round(minutes, 1)})
-                store.set_meta(f"crawl:{src.name}", {"page": 1, "started": ts, "prev_first": None})
+                store.set_meta(f"crawl:{src.name}", {"page": 1, "started": ts, "prev_keys": []})
                 log.info("🔄 Barrido completo %s: %d páginas en %.0f min", src.name, page, minutes)
             else:
                 store.set_meta(f"crawl:{src.name}", {"page": page + 1, "started": cur.get("started") or ts,
-                                                     "prev_first": first_key})
+                                                     "prev_keys": keys})
             if alerts:
                 await self.mon.dispatch(store, alerts, ts)
         self.pages_done += 1

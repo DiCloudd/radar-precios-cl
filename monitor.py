@@ -56,6 +56,7 @@ class Monitor:
         self.hunts: set[asyncio.Task] = set()
         self.fast_count = 0                     # para rotar fuentes con fast_every > 1
         self.crawling = False                   # True si el rastreador de catálogo completo está activo
+        self.cycle_busy = False                 # True mientras un ciclo scrapea
         from crawler import crawl_sources
         self._crawled = {s for srcs in crawl_sources(config.SOURCES).values() for s in srcs}
 
@@ -142,7 +143,11 @@ class Monitor:
                     continue
                 jobs.append(self._scrape(src, 1 if mode == "fast" else src.max_pages))
             log.info("Ciclo %s: %d fuentes (%d en pausa)", mode.upper(), len(jobs), len(skipped))
-            report.results = list(await asyncio.gather(*jobs)) + skipped
+            self.cycle_busy = True                  # el rastreador cede el paso a los ciclos (⚡ más rápidos)
+            try:
+                report.results = list(await asyncio.gather(*jobs)) + skipped
+            finally:
+                self.cycle_busy = False
 
             system_alerts: list[Alert] = []
             for res in report.results:
