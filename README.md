@@ -102,3 +102,21 @@ Todo corre en GitHub: puedes apagar el computador y cerrar Claude.
 2. **Alertas**: en Telegram, chat con tu bot → nombre del bot arriba → **Notificaciones: activadas**. Puedes fijar el chat (desliza a la derecha → 📌).
 3. **¿Está funcionando?** En Telegram envía `/estado`, o mira "🕒 actualizado hace X min" en la app. Si dice más de 1 hora, revisa la pestaña *Actions* del repo (también desde la app GitHub para iPhone): ahí puedes presionar **Run workflow** en `monitor` para reactivarlo.
 4. **Pausar todo**: GitHub → *Settings → Secrets and variables → Actions → Variables* → `MONITOR_ON_ACTIONS = false`.
+
+## 🦖 Errores de precio: cómo funciona
+
+1. **Detección** (cada ~2–4 min en las listas ⚡ "menor a mayor"): descuento ≥70 % sobre un precio normal alto, precio absurdo para la categoría ("PS5 a $49.990"), caída ≥40 % en 24 h o muy bajo la mediana de otras tiendas.
+2. **✅ Verificación instantánea** (~15 s después): segunda lectura del mismo listado + ficha del producto (precio y stock) en Apple, Hites, MacOnline, Motorola, Multicentro, Samsung y Xiaomi. Falabella, PCFactory, Abc y Entel se confirman por el listado (sus fichas no se pueden leer desde la nube). Si la tienda ya lo corrigió, **no te molesta** (queda en el salón de la fama).
+3. **🦖 Aviso** con GIF, el veredicto (✅ confirmado / ⚠️ sin confirmar) y botones.
+4. **🎯 Modo caza**: relee el producto cada ~30 s durante 10 min y avisa si lo corrigen, se agota, lo retiran o sigue activo.
+5. **🏆 Salón de la fama** (app y `/errores` en Telegram): cada error, cuánto duró y cuánto ahorraba.
+
+`python main.py --selftest` (o *Actions → selftest*, corre solo cada día) verifica un producto real por tienda.
+
+## 📦 Categorías
+
+📱 Celulares · 💻 Notebooks · 📺 Televisores · 🎮 Consolas · 📲 Tablets · 🎧 Audífonos · ⌚ Smartwatches · 🧊 Electro (refrigeradores y lavadoras). Las ⚡ de las 4 últimas se revisan cada 2 ciclos rápidos para no recargar las tiendas.
+
+## 🤡 Ranking de tiendas chantas
+
+En la pestaña *Chantas*: índice 0–100 = 60 % descuentos inflados detectados con historial (necesita ~7 días) + 40 % descuento "tachado" promedio que anuncia cada tienda.
