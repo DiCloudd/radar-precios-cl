@@ -82,17 +82,30 @@ async def run_once(args) -> int:
     return 1 if rep.failed else 0
 
 
-def _build_and_publish(publish: bool) -> None:
+def _build_and_publish(publish: bool, essential: bool = True) -> bool:
+    """essential=False (publicación periódica dentro de la ventana) respeta el cupo de builds/hora de Pages."""
+    import maintenance as M
     from dashboard import build_site
     from publisher import publish as do_publish
+    from storage import PriceStore
     log = logging.getLogger("main")
     try:
+        builds = None
+        with PriceStore(config.DB_PATH) as store:
+            if publish and not M.publish_allowed(store, essential):
+                log.info("Publicación periódica omitida: cupo de builds/hora de GitHub Pages (queda la final)")
+                return False
+            if publish:      # se registra ANTES de generar: así el registro viaja dentro de la BD publicada
+                builds = M.record_publish(store)
         out = build_site()
         log.info("Dashboard generado en %s", out / "index.html")
-        if publish:
-            do_publish(out)
+        published = bool(publish and do_publish(out))
+        with PriceStore(config.DB_PATH) as store:
+            M.notify_once_a_day(store, "size", M.size_warnings(M.sizes(out), builds))
+        return published
     except Exception as exc:  # noqa: BLE001 - publicar nunca debe detener el monitor
         log.error("Error generando/publicando el dashboard: %s", exc)
+        return False
 
 
 async def run_loop(args) -> None:
@@ -105,7 +118,8 @@ async def run_loop(args) -> None:
             asyncio.get_running_loop().add_signal_handler(sig, stop.set)
         except NotImplementedError:   # Windows
             pass
-    last_deep = last_pub = 0.0
+    last_deep = 0.0
+    last_pub = time.time()             # sin publicación inmediata: 1 a mitad de ventana + 1 final (≤ ~9 builds/h)
     dirty = False                      # hay datos nuevos sin publicar
     deadline = time.time() + args.duration * 60 if args.duration else None
     from telegram_bot import TelegramBot
@@ -136,12 +150,18 @@ async def run_loop(args) -> None:
             except Exception:  # noqa: BLE001
                 log.exception("Ciclo falló; se reintenta en el siguiente")
             if time.time() - last_pub >= config.PUBLISH_INTERVAL:
-                await asyncio.to_thread(_build_and_publish, True)
-                last_pub, dirty = time.time(), False
+                if await asyncio.to_thread(_build_and_publish, True, False):
+                    dirty = False
+                last_pub = time.time()
             try:
                 mon.daily_summary()
+                import maintenance as M
+                from storage import PriceStore
+                with PriceStore(config.DB_PATH) as store:
+                    M.daily_cleanup(store)                       # 🧹 1 vez al día
+                    M.notify_once_a_day(store, "budget", M.budget_warnings(M.request_budget()))
             except Exception:  # noqa: BLE001
-                log.exception("Resumen diario falló")
+                log.exception("Resumen/limpieza diaria falló")
             wait = max(10.0, config.FAST_INTERVAL / speed * random.uniform(0.75, 1.25) - (time.time() - t0))
             if deadline:
                 wait = min(wait, max(0.0, deadline - time.time()))

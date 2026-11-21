@@ -255,7 +255,7 @@ function kpis() {
 function catChips() {
   const cats = [["all", "Todo"], ...Object.entries(D.categories || {})];
   $("#catchips").innerHTML = cats.map(([k, l]) => {
-    const n = k === "all" ? D.products.filter(p => !p.missing).length : D.products.filter(p => !p.missing && p.cat === k).length;
+    const cc = D.catCounts || {}, n = k === "all" ? Object.values(cc).reduce((a, b) => a + b, 0) : (cc[k] || 0);
     return `<button class="chip ${state.cat === k ? "on" : ""}" data-c="${k}">${esc(l)} <span style="opacity:.6">${n}</span></button>`;
   }).join("");
   $("#catchips").querySelectorAll(".chip").forEach(b => b.onclick = () => {
@@ -265,7 +265,7 @@ function catChips() {
 }
 
 function storeChips() {
-  const sites = [...new Map(D.products.map(p => [p.site, p.store])).entries()];
+  const sites = [...new Map(D.stores.map(s => [s.site, s.label])).entries()];
   $("#storechips").innerHTML = sites.map(([s, l]) => `<button class="chip ${state.stores.has(s) ? "on" : ""}" data-s="${s}">${esc(l)}</button>`).join("");
   $("#storechips").querySelectorAll(".chip").forEach(b => b.onclick = () => {
     state.stores.has(b.dataset.s) ? state.stores.delete(b.dataset.s) : state.stores.add(b.dataset.s); state.page = 0; storeChips(); render(); });
@@ -381,8 +381,10 @@ function render() {
   $("#next")?.addEventListener("click", () => { state.page++; render(); });
 }
 
-function openProduct(key) {
-  const p = D.products.find(x => x.key === key); if (!p) return;
+async function openProduct(key) {
+  let p = D.products.find(x => x.key === key);
+  if (!p) { await ensureFull(); p = D.products.find(x => x.key === key); }
+  if (!p) return;
   const pr = p.pred || {};
   const others = (D.comparisons.find(c => c.group === p.group)?.items || []).filter(i => i.key !== p.key);
   $("#dlgbody").innerHTML = `<div class="row" style="justify-content:space-between"><div><div class="store">${esc(p.store)}</div><h3>${esc(p.name)}</h3></div>
@@ -412,15 +414,28 @@ function openProduct(key) {
   }
 }
 
-$("#tabs").onclick = e => { const b = e.target.closest("button"); if (!b) return;
-  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); state.tab = b.dataset.t; state.page = 0; render(); };
-$("#q").oninput = e => { state.q = e.target.value; state.page = 0; render(); };
+$("#tabs").onclick = async e => { const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); state.tab = b.dataset.t; state.page = 0;
+  if (state.tab === "all" && D.coreOnly) { $("#view").innerHTML = `<div class="empty">📦 Cargando el catálogo completo…</div>`; await ensureFull(); }
+  render(); };
+$("#q").oninput = async e => { state.q = e.target.value; state.page = 0; render();
+  if (state.q.trim() && D.coreOnly) { await ensureFull(); render(); } };   // buscar = en TODO el catálogo
 $("#sort").onchange = e => { state.sort = e.target.value; render(); };
 
+let fullLoading = null;
+async function ensureFull() {            // 📦 catálogo completo: solo al buscar, abrir "Todos" o un producto fuera del resumen
+  if (!D || !D.coreOnly) return;
+  fullLoading = fullLoading || fetch("products.json?t=" + Date.now()).then(r => r.json()).then(all => {
+    D.products = all; D.coreOnly = false; }).catch(() => {}).finally(() => { fullLoading = null; });
+  await fullLoading;
+}
+
 async function load() {
+  const wasFull = D && !D.coreOnly;      // si ya habías abierto el catálogo completo, se mantiene al refrescar
   try {
     D = await (await fetch("data.json?t=" + Date.now())).json();
   } catch (e) { $("#view").innerHTML = `<div class="empty">No se pudo cargar data.json</div>`; return; }
+  if (wasFull || state.tab === "all" || state.q.trim()) await ensureFull();
   $("#updated").textContent = "🕒 actualizado " + ago(D.generated);
   $("#runner").textContent = "runner: " + D.runner;
   const stale = Date.now() - new Date(D.generated) > 3 * 3600e3;

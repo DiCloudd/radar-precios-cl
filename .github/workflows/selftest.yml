@@ -6,6 +6,10 @@ on:
   schedule:
     - cron: "17 11 * * *"      # 08:17 Chile
 
+permissions:
+  contents: read
+  pages: read        # consultar cuántos builds de Pages hubo en la última hora
+
 jobs:
   selftest:
     runs-on: ubuntu-latest
@@ -24,3 +28,16 @@ jobs:
           git show origin/gh-pages:data/prices.db.gz | gunzip > /tmp/audit.db
           python tools/audit_alerts.py /tmp/audit.db | tee /tmp/audit.txt
           grep -q "FALSOS POSITIVOS (alertarían HOY como producto nuevo): 0 " /tmp/audit.txt || (echo "::warning::Hay falsos positivos nuevos: revisa la auditoría"; exit 1)
+      - name: Límites del plan gratis (tamaños, builds/hora, peticiones por tienda)
+        env:
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in data.json products.json data/prices.db.gz; do
+            printf "%-20s %s bytes\n" "$f" "$(curl -sI "$PAGES_URL/$f" | grep -i content-length | tr -dc 0-9)"
+          done
+          SINCE=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M)
+          BUILDS=$(gh api "repos/${{ github.repository }}/pages/builds?per_page=30" --jq "[.[] | select(.created_at > \"$SINCE\")] | length")
+          echo "builds de Pages en la última hora: $BUILDS (límite blando: 10)"
+          python -c "import maintenance as M; b=M.request_budget(); print('peticiones/min por tienda:', b); w=M.budget_warnings(b); [print('::warning::'+x) for x in w]"
+          [ "$BUILDS" -le 10 ] || echo "::warning::Más de 10 builds de Pages en la última hora"

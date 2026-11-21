@@ -35,7 +35,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       BROWSER_FALLBACK: "false"
-      PUBLISH_INTERVAL: "300"
+      PUBLISH_INTERVAL: "360"      # 1 publicación a mitad de ventana + la final: ≤ ~9 builds/h (límite blando de Pages: 10)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

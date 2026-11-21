@@ -184,12 +184,46 @@ def export_files(data: dict, store: PriceStore, out: Path) -> None:
         pass
 
 
+CORE_LIMIT = 2500
+
+
+def _cat_counts(products: list[dict]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for p in products:
+        if not p["missing"]:
+            out[p["cat"]] = out.get(p["cat"], 0) + 1
+    return out
+
+
+def core_products(data: dict) -> list[dict]:
+    """Lo que la app necesita al abrir: ofertas, mínimos, sospechosas, comparador y errores (máx. CORE_LIMIT)."""
+    needed = {i["key"] for c in data["comparisons"] for i in c["items"]} | {e["key"] for e in data.get("errors", [])}
+    def score(p: dict) -> float:
+        s = 0.0
+        if p["key"] in needed:
+            s += 1000
+        if p["ch24"] is not None and p["ch24"] < 0:
+            s += 500 - p["ch24"]
+        if p["atMin"]:
+            s += 300
+        if p["fake"]:
+            s += 200
+        s += min(p["disc"] or 0, 90)
+        return s
+    ranked = sorted((p for p in data["products"] if not p["missing"]), key=score, reverse=True)
+    return [p for p in ranked[:CORE_LIMIT] if score(p) > 0] or ranked[:300]
+
+
 def build_site(out: Path = config.SITE_DIR) -> Path:
     out.mkdir(parents=True, exist_ok=True)
     with PriceStore(config.DB_PATH) as store:
         data = build_data(store)
         export_files(data, store, out / "exports")
-    (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    dump = lambda obj: json.dumps(obj, ensure_ascii=False, separators=(",", ":"))   # noqa: E731
+    # 📦 catálogo completo aparte (se carga solo al buscar / abrir "Todos"); data.json queda liviano
+    (out / "products.json").write_text(dump(data["products"]), encoding="utf-8")
+    core = dict(data, products=core_products(data), catCounts=_cat_counts(data["products"]), coreOnly=True)
+    (out / "data.json").write_text(dump(core), encoding="utf-8")
     for f in TEMPLATE_DIR.iterdir():
         if f.is_file():
             shutil.copy2(f, out / f.name)
