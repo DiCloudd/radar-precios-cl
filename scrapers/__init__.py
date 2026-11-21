@@ -4,6 +4,7 @@ from __future__ import annotations
 from .base import FetchContext, Scraper
 from .brands import AppleScraper, SamsungScraper
 from .falabella import FalabellaScraper
+from .lenovo import LenovoScraper
 from .lider import LiderScraper
 from .paris import ParisScraper
 from .pcfactory import PCFactoryScraper
@@ -16,7 +17,7 @@ SCRAPERS: dict[str, type[Scraper]] = {
     cls.site: cls for cls in (
         FalabellaScraper, ParisScraper, PCFactoryScraper, LiderScraper, AbcScraper, HitesScraper,
         EntelScraper, MovistarScraper, SamsungScraper, AppleScraper, ProductPageScraper,
-        MotorolaScraper, XiaomiScraper, MacOnlineScraper, MulticentroScraper,
+        MotorolaScraper, XiaomiScraper, MacOnlineScraper, MulticentroScraper, LenovoScraper,
     )
 }
 

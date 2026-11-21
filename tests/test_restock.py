@@ -179,3 +179,27 @@ def test_dashboard_marks_gangas():
              mk("d", "Xiaomi 14 Ultra 512GB Seminuevo", 549_990, "xiaomi 14 ultra 512gb reacond")]
     _mark_gangas(items)
     assert [bool(i["ganga"]) for i in items] == [False, False, True, False]
+
+
+# ---------------------------------------------------------------- 💻 Lenovo (API JSON de su tienda)
+def test_lenovo_parse_and_page_url():
+    import json as _json
+    from scrapers.lenovo import LenovoScraper
+    api = {"data": {"pageCount": 6, "data": [{"products": [
+        {"productCode": "83JE00UWCL", "productName": "NB LOQ 15IRX10 I5 16G 512G 11S",
+         "summary": 'Lenovo LOQ Gen 10 (15" Intel) GeForce RTX 5060', "finalPrice": "1399993.00",
+         "webPrice": "2235345.00", "inventoryStatus": 1, "purchaseFlag": True, "marketingStatus": "Available",
+         "url": "/p/notebooks/loq-laptops/lenovo-loq-15irx10/83je00uwcl",
+         "media": {"thumbnail": {"imageAddress": "//p1-ofp.static.pub/x.png"}}},
+        {"productCode": "82XQ005VCL", "productName": "NB IP Slim 3 15AMN8 R3 8G 512G 11S",
+         "summary": 'IdeaPad Slim 3 Gen 8 (15" AMD)', "finalPrice": "499991.00", "webPrice": "499991.00",
+         "inventoryStatus": 0, "purchaseFlag": False, "url": "/p/x/82xq005vcl", "media": {}}]}]}}
+    res = LenovoScraper().parse(_json.dumps(api), "u")
+    a, b = res.products
+    assert res.total_pages == 6
+    assert a.key == "lenovo:83JE00UWCL" and a.price == 1_399_993 and a.list_price == 2_235_345 and a.in_stock
+    assert a.name.startswith("Lenovo LOQ Gen 10") and "83JE00UWCL" in a.name and a.image.startswith("https://")
+    assert b.name.startswith("Lenovo IdeaPad") and b.list_price is None and b.in_stock is False
+    url = LenovoScraper().page_url("https://www.lenovo.com/cl/es/notebooks/#7ca29953", 2)
+    assert "pageFilterId=7ca29953" in url and "%2522page%2522%253A%25222%2522" in url
+    assert url.endswith("#https://www.lenovo.com/cl/es/notebooks/")

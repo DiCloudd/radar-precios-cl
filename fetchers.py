@@ -59,13 +59,13 @@ class HttpFetcher:
         self._last: dict[str, float] = {}
         self._robots: dict[str, tuple[float, urllib.robotparser.RobotFileParser | None]] = {}
 
-    def _headers(self, origin: str, accept: str) -> dict[str, str]:
+    def _headers(self, origin: str, accept: str, referer: str | None = None) -> dict[str, str]:
         return {
             "User-Agent": config.USER_AGENT,
             "Accept": accept,
             "Accept-Language": "es-CL,es;q=0.9,en;q=0.7",
             "Accept-Encoding": "gzip, deflate",
-            "Referer": origin + "/",
+            "Referer": referer or origin + "/",
             "Upgrade-Insecure-Requests": "1",
             "Sec-Fetch-Dest": "document",
             "Sec-Fetch-Mode": "navigate",
@@ -103,7 +103,7 @@ class HttpFetcher:
         return True if rp is None else rp.can_fetch("*", url)
 
     async def get(self, url: str, *, accept: str = "text/html,application/xhtml+xml,*/*;q=0.8",
-                  as_json: bool = False, retries: int | None = None):
+                  as_json: bool = False, retries: int | None = None, referer: str | None = None):
         retries = retries or config.MAX_RETRIES
         parts = urlsplit(url)
         domain, origin = parts.netloc, f"{parts.scheme}://{parts.netloc}"
@@ -117,7 +117,7 @@ class HttpFetcher:
                 if wait > 0:
                     await asyncio.sleep(wait)
                 try:
-                    r = await client.get(url, headers=self._headers(origin, accept))
+                    r = await client.get(url, headers=self._headers(origin, accept, referer))
                 except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError,
                         httpx.TimeoutException) as exc:
                     last_exc = exc

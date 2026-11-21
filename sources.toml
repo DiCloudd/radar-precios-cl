@@ -27,6 +27,8 @@
 #     LG            -> precios solo con JavaScript (sin datos estructurados)
 #     WOM           -> precios ligados a planes/portabilidad y catálogo estático diario: alertas engañosas
 #     MacCenter, Reifstore -> ya no existen · Wei -> casi no vende celulares
+#     Honor, Oppo   -> sus sitios de Chile no venden ni muestran precios (derivan a otras tiendas)
+#     ASUS Store    -> cl.store.asus.com responde 403 a las IPs de la nube (incluso la portada)
 # ============================================================================
 
 
@@ -250,6 +252,22 @@ site = "multicentro"
 category = "notebooks"
 url = "https://www.multicentro.cl/collections/computadores-y-notebook"
 max_pages = 1
+fast = false
+
+[[source]]
+name = "Lenovo · Notebooks ⚡"
+site = "lenovo"
+category = "notebooks"
+url = "https://www.lenovo.com/cl/es/notebooks/#7ca29953-e3fd-48a9-8c04-b790cfef3842"
+max_pages = 1            # la API ya entrega de menor a mayor precio
+fast_every = 3
+
+[[source]]
+name = "Lenovo · Notebooks"
+site = "lenovo"
+category = "notebooks"
+url = "https://www.lenovo.com/cl/es/notebooks/#7ca29953-e3fd-48a9-8c04-b790cfef3842"
+max_pages = 8            # ~210 equipos, 40 por página (API JSON de su web)
 fast = false
 
 
