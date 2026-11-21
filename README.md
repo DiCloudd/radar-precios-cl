@@ -1,10 +1,10 @@
 # 📡 Radar de Precios Chile
 
-Monitor 24/7 de smartphones en **9 tiendas chilenas**, con historial, comparador entre tiendas, detector de ofertas falsas, alertas 🦖 Godzilla y dashboard web público. **Costo: $0.**
+Monitor 24/7 de smartphones en **13 tiendas chilenas**, con historial, comparador entre tiendas, detector de ofertas falsas, alertas 🦖 Godzilla y dashboard web público. **Costo: $0.**
 
 | | |
 |---|---|
-| 🏬 Tiendas | Falabella · Paris · PCFactory · Lider · Abc (La Polar) · Hites · Entel · Samsung Store · Apple Store |
+| 🏬 Tiendas | Falabella · Paris · PCFactory · Lider · Abc (La Polar) · Hites · Entel · Samsung Store · Apple Store · Motorola Store · Xiaomi Store · MacOnline · Multicentro |
 | ⚡ Frecuencia | Página 1 de cada tienda cada ~2 min · todas las páginas cada ~20 min · x2 en CyberDay/Black Friday |
 | 🧠 Alertas | bajadas, mínimo histórico *real*, precio objetivo, 🦖 caídas ≥40 % en 24 h, 💥 posibles errores de precio, stock, desaparecidos |
 | 🤡 Anti-chanta | detecta precios "normales" inflados y descuentos permanentes |
@@ -67,6 +67,10 @@ Ver todos los comandos: `python main.py --help`.
 | Entel | JSON Endeca `attributes` | incluye cuotas y stock |
 | Samsung Store | JSON-LD `ItemList` | |
 | Apple Store | tarjetas `rf-hcard` ("Desde $X") | precio base por modelo |
+| Motorola Store | API VTEX `catalog_system/pub/products/search` | precio, normal, stock, cuotas |
+| Xiaomi Store | JSON-LD `ItemList` | precio "desde" por modelo |
+| MacOnline | JSON-LD `Product` por modelo (Spree) | Apple Premium Partner; solo escaneo profundo |
+| Multicentro | Shopify `products.json` | |
 | ~~Movistar~~ | — | robots.txt prohíbe bots |
 | ~~Ripley~~, ~~MercadoLibre~~ | — | bloqueo explícito |
 
@@ -87,3 +91,13 @@ Ver todos los comandos: `python main.py --help`.
 | `/estado` · `/resumen` | salud de tiendas · resumen del día |
 
 Bajo cada alerta: **📊 Historial** · **🎯 Avisar -5 %** · **🔕 24 h**. El bot responde al instante durante cada ventana de GitHub Actions; lo que escribas entre ventanas se contesta al iniciar la siguiente.
+
+
+## 📱 Usarlo desde el iPhone (sin PC)
+
+Todo corre en GitHub: puedes apagar el computador y cerrar Claude.
+
+1. **App en la pantalla de inicio**: abre https://dicloudd.github.io/radar-precios-cl/ en **Safari** → botón **Compartir** → **Agregar a pantalla de inicio**. Abre a pantalla completa, con ícono propio, y se actualiza sola al abrirla.
+2. **Alertas**: en Telegram, chat con tu bot → nombre del bot arriba → **Notificaciones: activadas**. Puedes fijar el chat (desliza a la derecha → 📌).
+3. **¿Está funcionando?** En Telegram envía `/estado`, o mira "🕒 actualizado hace X min" en la app. Si dice más de 1 hora, revisa la pestaña *Actions* del repo (también desde la app GitHub para iPhone): ahí puedes presionar **Run workflow** en `monitor` para reactivarlo.
+4. **Pausar todo**: GitHub → *Settings → Secrets and variables → Actions → Variables* → `MONITOR_ON_ACTIONS = false`.
