@@ -82,6 +82,7 @@ NON_PRODUCT = re.compile(
     r"(plus|pass|ultimate|essential|extra|premium|online)\s*\d+\s*meses|\d+\s*meses de (suscrip|membres|"
     r"playstation|xbox|nintendo|game)|solo caja|caja vac[ií]a|dummy|maqueta|de exhibici[oó]n|game ?pass|"
     r"photography kit|kit (pro|fotogr[aá]fico|de c[aá]mara)\b|"
+    r"\btipo (airpods|apple|iphone|samsung|galaxy)|r[eé]plica|\b1:1\b|\bclon\b|gen[eé]rico|"
     # correas en cualquier parte del nombre ("Galaxy Watch7 Fabric Band", "Sport Loop", "Correa de silicona")
     r"\b(fabric|sport|silicone|silicona|nylon|milanese|milanesa|link|leather|cuero|metal|trail|alpine|ocean|solo|"
     r"braided|magn[eé]tica)\s+(band|loop|correa|malla)\b|\b(band|loop) (de|para)\b|"
@@ -131,8 +132,10 @@ TOO_CHEAP = {
     "televisores": (re.compile(r"\b(tv|televisor|smart ?tv)\b", re.I), 100_000),
     "celulares": (re.compile(r"iphone 1[5-9]|iphone air|galaxy s2\d|galaxy z|pixel \d|pro max|xiaomi 1[5-9]", re.I), 150_000),
     "tablets": (re.compile(r"ipad|galaxy tab s\d|\btab s\d|xiaomi pad|redmi pad pro|lenovo tab p\d|matepad", re.I), 100_000),
-    "audifonos": (re.compile(r"airpods (pro|max)|wh-?1000|wf-?1000|galaxy buds\s?\d? ?pro|buds\d? pro|"
-                             r"bose (qc|quietcomfort)|beats (studio|fit|solo)", re.I), 40_000),
+    # con MARCA: los genéricos "Air Buds Pro 3.0", "Earbuds Pro TWS" cuestan $13–37k de verdad (auditado)
+    "audifonos": (re.compile(r"airpods (pro|max)|sony.*\b(wh|wf)-?1000|\b(wh|wf)-?1000x|galaxy buds\s?\d*\s?pro|"
+                             r"bose (qc|quietcomfort|ultra)|beats (studio|fit|solo|powerbeats)|sennheiser momentum|"
+                             r"jbl tour", re.I), 40_000),
     "smartwatches": (re.compile(r"apple watch|galaxy watch|pixel watch|garmin (fenix|forerunner|epix|venu)|"
                                 r"huawei watch (gt|\d)|amazfit (gtr|balance|t-rex)", re.I), 50_000),
     "electro": (re.compile(r"refrigerador|lavadora|secadora|side by side|french door|no frost", re.I), 100_000),

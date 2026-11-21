@@ -77,3 +77,20 @@ def test_store_category_rules_are_category_aware():
     assert not is_accessory("Audífonos Sony WH-1000XM6", "audifonos", "Audífonos > Marcas > ACC.ELECT.MENOR")
     assert not is_accessory("Consola PlayStation 5", "consolas", "Consolas > VideoJuegos > Marcas > SONY")
     assert is_accessory("Control DualSense", "consolas", "Consolas > VideoJuegos > Marcas > CONTROLES")
+
+
+@pytest.mark.parametrize("name,price", [
+    ("AUDIFONOS TWS AIR BUDS PRO 3.0 09309 BLANCO", 12990),          # catálogo completo (9.805 productos)
+    ("Audifonos Bluetooth Ergonomic Aud·buds Pro 3.0", 14990),
+    ("Audifonos Comfort Earbuds Pro Tws 631w Bluetooth Negro", 19980),
+    ("Audífonos Airbuds Pro", 36990),
+    ("Audífonos tipo AirPods Pro réplica", 9990),
+])
+def test_generic_earbuds_are_not_premium(name, price):
+    assert price_error_reasons(P(name, price), "audifonos", is_new=True) == []
+
+
+@pytest.mark.parametrize("name", ["Apple AirPods Pro 3", "Samsung Galaxy Buds3 Pro", "Audífonos Sony WH-1000XM6",
+                                  "Audífonos Bose QuietComfort Ultra"])
+def test_branded_premium_earbuds_still_detected(name):
+    assert price_error_reasons(P(name, 9990), "audifonos", is_new=True)
