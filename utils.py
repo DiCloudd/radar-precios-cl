@@ -121,11 +121,12 @@ def ld_in_stock(item: dict) -> bool | None:
     offers = item.get("offers") or []
     if isinstance(offers, dict):
         offers = [offers]
-    for o in offers:
-        av = str((o or {}).get("availability", ""))
-        if av:
-            return "InStock" in av or "LimitedAvailability" in av
-    return None
+    states = [str((o or {}).get("availability", "")) for o in offers if isinstance(o, dict)]
+    states = [s for s in states if s]
+    if not states:
+        return None
+    # varias ofertas (colores/variantes): hay stock si CUALQUIERA lo tiene
+    return any("InStock" in s or "LimitedAvailability" in s or "PreOrder" in s for s in states)
 
 
 def dedupe(products: list) -> list:

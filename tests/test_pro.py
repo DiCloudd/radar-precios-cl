@@ -220,3 +220,11 @@ async def test_monitor_error_flow_end_to_end(db, monkeypatch):
     assert errs["hites:2"]["outcome"] == "corregido antes del aviso" and errs["hites:1"]["verdict"] == "confirmed"
     assert hunts == [("hites:1", errs["hites:1"]["id"], 499990)]
     await mon.aclose()
+
+
+def test_stock_any_variant():
+    from utils import ld_in_stock
+    assert ld_in_stock({"offers": [{"availability": "https://schema.org/OutOfStock"},
+                                   {"availability": "https://schema.org/InStock"}]}) is True
+    assert ld_in_stock({"offers": [{"availability": "https://schema.org/OutOfStock"}]}) is False
+    assert ld_in_stock({"offers": []}) is None
