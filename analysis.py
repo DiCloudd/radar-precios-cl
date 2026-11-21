@@ -177,7 +177,7 @@ TIERS = {
     "celulares": [(re.compile(r"pro max|\bultra\b|z ?fold|iphone 1[7-9] pro|iphone air", re.I), 400_000),
                   (re.compile(r"iphone 1[6-9]|galaxy s2[5-9]|z ?flip|pixel [89]|xiaomi 1[5-9]", re.I), 250_000)],
     "notebooks": [(re.compile(r"macbook pro|rtx ?50[789]0|rtx ?40[789]0|\bi9\b|i9-|ryzen 9|legion|rog strix|"
-                              r"\bomen\b|zenbook s|xps|alienware", re.I), 400_000),
+                              r"\bomen\b|zenbook (s|duo)|xps|alienware|ultra (x?9|7)|ultra \d-\d{3}h", re.I), 400_000),
                   (re.compile(r"macbook air|\brtx\b|gaming|gamer|\btuf\b|victus|nitro|loq", re.I), 300_000)],
     "consolas": [(re.compile(r"ps5 pro|playstation 5 pro|switch 2|rog ally x|legion go", re.I), 300_000)],
     # OJO: QLED/Mini LED de 43–55" cuestan ~$200k (auditado): solo 65"+ y OLED de verdad suben el mínimo
@@ -363,7 +363,7 @@ def price_error_reasons(p, category: str, check_card: bool = True, is_new: bool 
     floor = category_floor(p.name, category, sc)
     discount_ok = discount_ok or bool(
         is_new and not refurb and not _marketplace(p) and p.list_price and p.list_price >= config.ERROR_EXTREME_LIST
-        and p.discount_pct and p.discount_pct >= config.ERROR_EXTREME_PCT and floor and p.price < floor * 2)
+        and p.discount_pct and p.discount_pct >= config.ERROR_EXTREME_PCT and floor and p.price < floor * 3)
     if discount_ok:
         out.append(f"-{p.discount_pct:.0f}% sobre su precio normal ({clp(p.list_price)})")
     elif cheap:
