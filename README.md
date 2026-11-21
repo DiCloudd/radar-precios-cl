@@ -9,7 +9,7 @@ Monitor 24/7 de smartphones en **9 tiendas chilenas**, con historial, comparador
 | 🧠 Alertas | bajadas, mínimo histórico *real*, precio objetivo, 🦖 caídas ≥40 % en 24 h, 💥 posibles errores de precio, stock, desaparecidos |
 | 🤡 Anti-chanta | detecta precios "normales" inflados y descuentos permanentes |
 | 📊 Dashboard | GitHub Pages: ofertas, comparador, gráficos, predicción, salud de tiendas, exportación Excel/CSV |
-| ☁️ Hosting | VM Oracle Cloud *Always Free* en Santiago (24/7) + GitHub Actions de respaldo |
+| ☁️ Hosting | GitHub Actions (ventanas de 12 min cada 15 min, ciclos de ~2 min) + GitHub Pages. Sin tarjeta, sin PC |
 
 ## Arquitectura
 
@@ -35,19 +35,15 @@ python -m venv .venv
 
 Ver todos los comandos: `python main.py --help`.
 
-## Despliegue 24/7 gratis
+## Despliegue 24/7 gratis (solo GitHub, sin tarjeta)
 
-1. **GitHub** (ya configurado): el repo público guarda el código, corre los tests y publica el dashboard en `https://<usuario>.github.io/<repo>`. El workflow `monitor` hace un escaneo cada ~15 min mientras no exista la VM.
-2. **Oracle Cloud Always Free, región Santiago** (`sa-santiago-1`):
-   - Crea la cuenta en oracle.com/cloud/free (pide tarjeta solo para verificar identidad; el plan *Always Free* no cobra).
-   - Crea una instancia **VM.Standard.A1.Flex** (ARM, 1–4 OCPU, 6–24 GB) con Ubuntu 24.04.
-   - Entra por SSH y ejecuta:
-     ```bash
-     curl -fsSL https://raw.githubusercontent.com/<usuario>/<repo>/main/deploy/oracle/setup.sh | bash -s -- <usuario>/<repo>
-     nano ~/price-monitor/.env        # GH_TOKEN, GH_REPO, PUBLIC_SITE_URL (y Telegram después)
-     bash ~/price-monitor/deploy/oracle/setup.sh <usuario>/<repo>
-     ```
-   - En GitHub: *Settings → Secrets and variables → Actions → Variables* → `MONITOR_ON_ACTIONS = false` (la VM toma el control).
+- **`.github/workflows/monitor.yml`**: GitHub lanza una *ventana* cada 15 min. Cada ventana dura ~12 min:
+  1 ciclo profundo + ciclos rápidos cada ~2 min, publicando el dashboard cada 5 min.
+- **Persistencia**: la BD (`data/prices.db.gz`) viaja entre ventanas dentro de la rama `gh-pages`.
+- **Secrets** (Settings → Secrets → Actions): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+- **Pausar todo**: variable de repo `MONITOR_ON_ACTIONS = false`.
+- Límite conocido: desde las IPs de GitHub (EE.UU.) **Paris responde 403**; el monitor lo pausa y reintenta cada vez más espaciado.
+  Desde una IP chilena funciona (opciones: correr `run_monitor.bat` en un PC/celular en Chile, o una VM — `deploy/oracle/setup.sh` queda listo por si algún día hay tarjeta de crédito).
 
 ## Anti-bloqueo: cómo se evita que te baneen
 

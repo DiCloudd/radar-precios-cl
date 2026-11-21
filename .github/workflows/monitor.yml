@@ -1,17 +1,22 @@
-# Runner en la nube de respaldo (gratis en repos públicos): un ciclo profundo cada ~15 min + publica el dashboard.
-# Cuando la VM de Oracle esté funcionando, desactívalo: Settings > Variables > MONITOR_ON_ACTIONS = false
+# Monitor en la nube, gratis (repo público). Cada ejecución es una "ventana" de ~12 min:
+# 1 ciclo profundo + ciclos rápidos cada ~2 min, publicando el dashboard cada 5 min.
+# GitHub lanza una ventana cada 15 min (a veces con retraso) -> cobertura casi continua.
 name: monitor
 on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Duración de la ventana (min)"
+        default: "12"
 
 permissions:
   contents: write
 
 concurrency:
   group: monitor
-  cancel-in-progress: false
+  cancel-in-progress: false       # la siguiente ventana espera a que termine la actual (nunca dos a la vez)
 
 jobs:
   run:
@@ -28,16 +33,23 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       BROWSER_FALLBACK: "false"
+      PUBLISH_INTERVAL: "300"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r requirements.txt
-      - name: Ciclo profundo + dashboard
-        run: python main.py --deep --publish
-      - name: Resumen diario (si corresponde)
-        run: python -c "from monitor import Monitor; Monitor().daily_summary()"
-        if: always()
-      - name: Re-publicar (incluye el estado del resumen)
-        run: python main.py --publish
-        if: always()
+
+      # La BD viaja entre ventanas dentro de la rama gh-pages. Se lee directo de git (instantáneo),
+      # no de la web publicada (que tarda ~1 min en actualizarse y podría estar desfasada).
+      - name: Restaurar base de datos
+        run: |
+          mkdir -p data
+          if git fetch -q --depth 1 origin gh-pages; then
+            git show origin/gh-pages:data/prices.db.gz | gunzip > data/prices.db && ls -lh data/prices.db
+          else
+            echo "Sin respaldo previo: se parte de cero"
+          fi
+
+      - name: Ventana de monitoreo
+        run: python main.py --loop --duration "${{ inputs.minutes || '12' }}"

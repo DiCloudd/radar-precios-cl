@@ -3,6 +3,7 @@
     python main.py                   # un ciclo rápido (página 1 de cada tienda)
     python main.py --deep            # un ciclo profundo (todas las páginas configuradas)
     python main.py --loop            # modo 24/7: rápido cada ~2 min, profundo cada ~20, publica el dashboard
+    python main.py --loop --duration 12   # ventana de 12 min (así corre en GitHub Actions cada 15 min)
     python main.py --dry-run         # no envía nada a Telegram (imprime en consola)
     python main.py --summary         # envía el resumen diario ahora
     python main.py --site falabella  # solo una tienda
@@ -30,6 +31,11 @@ from calendar_cl import active_event
 
 
 def setup_logging(verbose: bool) -> None:
+    for stream in (sys.stdout, sys.stderr):    # consolas Windows (cp1252) no soportan emojis
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
     root = logging.getLogger()
     root.setLevel(logging.DEBUG if verbose else logging.INFO)
@@ -98,9 +104,14 @@ async def run_loop(args) -> None:
         except NotImplementedError:   # Windows
             pass
     last_deep = last_pub = 0.0
+    dirty = False                      # hay datos nuevos sin publicar
+    deadline = time.time() + args.duration * 60 if args.duration else None
     log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)
     try:
         while not stop.is_set():
+            if deadline and time.time() + 60 >= deadline:     # sin tiempo para otro ciclo completo
+                log.info("⏱️ Ventana de %d min cumplida", args.duration)
+                break
             ev = active_event()
             speed = config.EVENT_SPEEDUP if ev else 1.0
             mode = "deep" if time.time() - last_deep >= config.DEEP_INTERVAL / speed else "fast"
@@ -109,6 +120,7 @@ async def run_loop(args) -> None:
             t0 = time.time()
             try:
                 rep = await mon.cycle(mode)
+                dirty = True
                 print_report(rep)
                 if mode == "deep":
                     last_deep = t0
@@ -116,18 +128,22 @@ async def run_loop(args) -> None:
                 log.exception("Ciclo falló; se reintenta en el siguiente")
             if time.time() - last_pub >= config.PUBLISH_INTERVAL:
                 await asyncio.to_thread(_build_and_publish, True)
-                last_pub = time.time()
+                last_pub, dirty = time.time(), False
             try:
                 mon.daily_summary()
             except Exception:  # noqa: BLE001
                 log.exception("Resumen diario falló")
             wait = max(10.0, config.FAST_INTERVAL / speed * random.uniform(0.75, 1.25) - (time.time() - t0))
+            if deadline:
+                wait = min(wait, max(0.0, deadline - time.time()))
             try:
                 await asyncio.wait_for(stop.wait(), timeout=wait)
             except asyncio.TimeoutError:
                 pass
     finally:
         await mon.aclose()
+        if dirty:                      # nunca terminar con datos sin publicar (en Actions se perderían)
+            await asyncio.to_thread(_build_and_publish, True)
         log.info("Monitor detenido.")
 
 
@@ -135,6 +151,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Monitor de precios Chile con alertas a Telegram")
     ap.add_argument("--deep", action="store_true", help="recorre todas las páginas configuradas")
     ap.add_argument("--loop", action="store_true", help="modo 24/7")
+    ap.add_argument("--duration", type=float, default=0,
+                    help="con --loop: minutos que dura la ventana (GitHub Actions); 0 = infinito")
     ap.add_argument("--dry-run", action="store_true", help="no envía a Telegram")
     ap.add_argument("--site", help="solo una tienda (falabella, paris, pcfactory, lider, abc, hites, entel, samsung, apple)")
     ap.add_argument("--summary", action="store_true", help="envía el resumen diario ahora")
