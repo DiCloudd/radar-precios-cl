@@ -68,15 +68,17 @@ def restore_db_if_missing() -> bool:
     """Si la BD local no existe (VM nueva, runner de Actions), la baja del último respaldo publicado."""
     if config.DB_PATH.exists() or not config.PUBLIC_SITE_URL:
         return False
-    url = f"{config.PUBLIC_SITE_URL}/data/prices.db.gz"
+    from backup import ENC_NAME, PLAIN_NAME, decode
     try:
-        r = httpx.get(url, timeout=60, follow_redirects=True)
-        if r.status_code != 200:
-            log.info("Sin respaldo previo en %s (%s): se parte de cero", url, r.status_code)
-            return False
-        config.DB_PATH.write_bytes(gzip.decompress(r.content))
-        log.info("BD restaurada desde %s (%.1f MB)", url, config.DB_PATH.stat().st_size / 1e6)
-        return True
-    except (httpx.HTTPError, OSError) as exc:
+        for name, enc in ((ENC_NAME, True), (PLAIN_NAME, False)):
+            url = f"{config.PUBLIC_SITE_URL}/data/{name}"
+            r = httpx.get(url, timeout=60, follow_redirects=True)
+            if r.status_code == 200:
+                config.DB_PATH.write_bytes(decode(r.content, enc))
+                log.info("BD restaurada desde %s (%.1f MB)", url, config.DB_PATH.stat().st_size / 1e6)
+                return True
+        log.info("Sin respaldo previo en %s: se parte de cero", config.PUBLIC_SITE_URL)
+        return False
+    except (httpx.HTTPError, OSError, RuntimeError) as exc:
         log.warning("No se pudo restaurar la BD: %s", exc)
         return False

@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 10
     env:
       BROWSER_FALLBACK: "false"
+      DB_KEY: ${{ secrets.DB_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,7 +26,7 @@ jobs:
       - name: Auditoría de falsos positivos y sensibilidad (catálogo real publicado)
         run: |
           git fetch -q --depth 1 origin gh-pages
-          git show origin/gh-pages:data/prices.db.gz | gunzip > /tmp/audit.db
+          python backup.py restore /tmp/audit.db
           python tools/audit_alerts.py /tmp/audit.db | tee /tmp/audit.txt
           grep -q "FALSOS POSITIVOS (alertarían HOY como producto nuevo): 0 " /tmp/audit.txt || (echo "::warning::Hay falsos positivos nuevos: revisa la auditoría"; exit 1)
       - name: Límites del plan gratis (tamaños, builds/hora, peticiones por tienda)
@@ -33,7 +34,7 @@ jobs:
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for f in data.json products.json data/prices.db.gz; do
+          for f in data.json products.json data/prices.db.enc; do
             printf "%-20s %s bytes\n" "$f" "$(curl -sI "$PAGES_URL/$f" | grep -i content-length | tr -dc 0-9)"
           done
           SINCE=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M)

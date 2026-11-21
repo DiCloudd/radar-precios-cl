@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Radar">
@@ -364,7 +366,7 @@ const views = {
     return `<div class="exp"><a href="exports/precios.xlsx" download><b>📗 Excel completo</b><span>Precios actuales, comparador e historial</span></a>
       <a href="exports/precios_actuales.csv" download><b>📄 CSV precios actuales</b><span>Una fila por producto</span></a>
       <a href="exports/historial.csv" download><b>🕒 CSV historial</b><span>Cada cambio de precio con fecha</span></a>
-      <a href="data/prices.db.gz" download><b>🗄️ Base de datos SQLite</b><span>Respaldo completo (gzip)</span></a>
+      <a href="exports/historial.csv" download><b>🗄️ Historial completo</b><span>El respaldo de la base va cifrado (privacidad)</span></a>
       <a href="data.json" target="_blank"><b>🧩 data.json</b><span>Para integrar con otras apps</span></a></div>`;
   },
 };

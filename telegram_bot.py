@@ -125,7 +125,7 @@ class TelegramBot:
     async def run(self, stop: asyncio.Event) -> None:
         try:
             await self.setup()
-            log.info("🤖 Bot @%s escuchando", self.username)
+            log.info("🤖 Bot de Telegram escuchando")       # sin el @nombre: los logs de Actions son públicos
         except Exception as exc:  # noqa: BLE001
             log.error("No se pudo iniciar el bot: %s", exc)
             return

@@ -72,7 +72,8 @@ def daily_cleanup(store: PriceStore, force: bool = False) -> dict | None:
 def sizes(site_dir: Path = config.SITE_DIR) -> dict[str, float]:
     def mb(p: Path) -> float:
         return round(p.stat().st_size / 1e6, 2) if p.exists() else 0.0
-    return {"db_gz": mb(site_dir / "data" / "prices.db.gz"), "data_json": mb(site_dir / "data.json"),
+    backup = site_dir / "data" / ("prices.db.enc" if (site_dir / "data" / "prices.db.enc").exists() else "prices.db.gz")
+    return {"db_gz": mb(backup), "data_json": mb(site_dir / "data.json"),
             "products_json": mb(site_dir / "products.json"), "db": mb(config.DB_PATH)}
 
 

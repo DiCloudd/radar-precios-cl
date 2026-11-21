@@ -10,6 +10,7 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      DB_KEY: ${{ secrets.DB_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,5 +19,5 @@ jobs:
       - name: Leer la BD publicada (ahí está tu chat registrado con /start)
         run: |
           mkdir -p data
-          git fetch -q --depth 1 origin gh-pages && git show origin/gh-pages:data/prices.db.gz | gunzip > data/prices.db
+          python backup.py restore data/prices.db
       - run: python main.py --godzilla-test

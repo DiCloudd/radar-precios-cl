@@ -34,6 +34,7 @@ jobs:
       PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      DB_KEY: ${{ secrets.DB_KEY }}         # 🔐 cifra/descifra el respaldo público de la BD
       BROWSER_FALLBACK: "false"
       PUBLISH_INTERVAL: "360"      # 1 publicación a mitad de ventana + la final: ≤ ~9 builds/h (límite blando de Pages: 10)
     steps:
@@ -48,13 +49,20 @@ jobs:
         run: |
           mkdir -p data
           if git fetch -q --depth 1 origin gh-pages; then
-            git show origin/gh-pages:data/prices.db.gz | gunzip > data/prices.db && ls -lh data/prices.db
+            python backup.py restore data/prices.db
           else
             echo "Sin respaldo previo: se parte de cero"
           fi
 
       - name: Ventana de monitoreo
         run: python main.py --loop --duration "${{ inputs.minutes || '12' }}"
+
+      - name: Autodiagnóstico diario (GitHub no dispara los horarios programados en este repo)
+        if: success()
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          N=$(gh run list --workflow selftest.yml --limit 10 --json createdAt --jq "[.[] | select(.createdAt|startswith(\"$TODAY\"))] | length")
+          if [ "$N" -eq 0 ]; then gh workflow run selftest.yml && echo "selftest lanzado"; else echo "selftest de hoy ya corrió"; fi
 
       - name: Encadenar la siguiente ventana
         if: success()

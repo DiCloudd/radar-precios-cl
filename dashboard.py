@@ -32,6 +32,8 @@ def build_data(store: PriceStore) -> dict:
     since24 = ago(hours=24)
     products = []
     for r in store.products():
+        if r["key"].startswith("url:"):            # 🙈 productos que sigues con /seguir: privados, no se publican
+            continue
         hist = [(h["ts"], h["price"]) for h in store.history(r["key"])]
         prices = [p for _, p in hist] or [r["price"]]
         old = next((p for ts, p in reversed(hist) if ts < since24), None)
@@ -122,7 +124,10 @@ def build_data(store: PriceStore) -> dict:
         history_days = (datetime.now() - datetime.fromisoformat(first)).days
 
     alerts = [dict(r) for r in store.conn.execute(
-        "SELECT ts, key, kind, price, message FROM alerts ORDER BY id DESC LIMIT 150")]
+        "SELECT ts, key, kind, price, message FROM alerts "
+        # 🙈 privado: objetivos, stock y desaparecidos de lo que TÚ vigilas no van al feed público
+        "WHERE kind NOT IN ('target', 'stock_out', 'stock_back', 'missing', 'back') AND key NOT LIKE 'url:%' "
+        "ORDER BY id DESC LIMIT 150")]
     ev = active_event()
     return {
         "generated": datetime.now().isoformat(timespec="seconds"), "runner": config.RUNNER_NAME,
@@ -151,7 +156,7 @@ def export_files(data: dict, store: PriceStore, out: Path) -> None:
             w.writerow([p.get(c) for c in cols])
     hist_rows = store.conn.execute(
         "SELECT h.ts, p.site, p.name, h.price, h.list_price, h.card_price, h.key FROM prices h "
-        "JOIN products p ON p.key=h.key ORDER BY h.ts").fetchall()
+        "JOIN products p ON p.key=h.key WHERE h.key NOT LIKE 'url:%' ORDER BY h.ts").fetchall()
     with open(out / "historial.csv", "w", newline="", encoding="utf-8-sig") as fh:
         w = csv.writer(fh)
         w.writerow(["ts", "site", "name", "price", "list_price", "card_price", "key"])
@@ -228,15 +233,10 @@ def build_site(out: Path = config.SITE_DIR) -> Path:
         if f.is_file():
             shutil.copy2(f, out / f.name)
     shutil.copy2(godzilla.asset(), out / "godzilla.gif")
-    (out / "data").mkdir(exist_ok=True)
-    # respaldo de la BD (snapshot consistente con la API de backup de sqlite)
-    tmp = out / "data" / "prices.snapshot.db"
-    src = sqlite3.connect(config.DB_PATH)
-    dst = sqlite3.connect(tmp)
-    src.backup(dst)
-    dst.close(), src.close()
-    with open(tmp, "rb") as fi, gzip.open(out / "data" / "prices.db.gz", "wb", compresslevel=9) as fo:
-        shutil.copyfileobj(fi, fo)
-    tmp.unlink()
+    # 🔐 respaldo de la BD: cifrado con DB_KEY (GitHub Secrets) porque la rama gh-pages es pública
+    from backup import write_backup
+    write_backup(config.DB_PATH, out / "data")
     (out / ".nojekyll").write_text("")
+    # 🙈 que los buscadores no indexen el radar (solo lo ve quien tenga el link)
+    (out / "robots.txt").write_text("User-agent: *\nDisallow: /\n", encoding="utf-8")
     return out
