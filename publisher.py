@@ -18,18 +18,36 @@ import config
 log = logging.getLogger("publisher")
 
 
-def _git(*args: str, cwd: Path) -> str:
-    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=180)
+DEPLOY_KEY = config.DATA_DIR / "deploy_key"   # llave SSH solo-este-repo (la genera deploy/oracle/setup.sh)
+
+
+def _git(*args: str, cwd: Path, env: dict | None = None) -> str:
+    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=180, env=env)
     if r.returncode != 0:
         raise RuntimeError(f"git {' '.join(args[:2])}: {(r.stderr or r.stdout).strip()[:300]}")
     return r.stdout
 
 
+def _remote() -> tuple[str, dict | None] | None:
+    """Token (GitHub Actions) o deploy key SSH (VM). Devuelve (url_remota, entorno_git)."""
+    if not config.GH_REPO:
+        return None
+    if config.GH_TOKEN:
+        return f"https://x-access-token:{config.GH_TOKEN}@github.com/{config.GH_REPO}.git", None
+    if DEPLOY_KEY.exists():
+        import os
+        ssh = (f'ssh -i "{DEPLOY_KEY}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new '
+               f'-o UserKnownHostsFile="{config.DATA_DIR / "known_hosts"}"')
+        return f"git@github.com:{config.GH_REPO}.git", {**os.environ, "GIT_SSH_COMMAND": ssh}
+    return None
+
+
 def publish(site_dir: Path = config.SITE_DIR) -> bool:
-    if not (config.GH_TOKEN and config.GH_REPO):
-        log.info("Publicación omitida: faltan GH_TOKEN / GH_REPO en .env")
+    target = _remote()
+    if target is None:
+        log.info("Publicación omitida: falta GH_REPO y una credencial (GH_TOKEN o data/deploy_key)")
         return False
-    remote = f"https://x-access-token:{config.GH_TOKEN}@github.com/{config.GH_REPO}.git"
+    remote, env = target
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp) / "site"
         shutil.copytree(site_dir, work)
@@ -39,9 +57,9 @@ def publish(site_dir: Path = config.SITE_DIR) -> bool:
         _git("add", "-A", cwd=work)
         _git("commit", "-q", "-m", f"dashboard ({config.RUNNER_NAME})", cwd=work)
         try:
-            _git("push", "-q", "--force", remote, "gh-pages", cwd=work)
+            _git("push", "-q", "--force", remote, "gh-pages", cwd=work, env=env)
         except RuntimeError as exc:   # nunca filtrar el token en logs
-            raise RuntimeError(str(exc).replace(config.GH_TOKEN, "***")) from None
+            raise RuntimeError(str(exc).replace(config.GH_TOKEN, "***") if config.GH_TOKEN else str(exc)) from None
     log.info("Dashboard publicado en GitHub Pages (%s)", config.PUBLIC_SITE_URL or config.GH_REPO)
     return True
 
