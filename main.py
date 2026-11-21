@@ -130,6 +130,7 @@ async def run_loop(args) -> None:
     crawl_task = asyncio.create_task(crawler.run(bot_stop)) if config.CRAWL else None   # 🔄 catálogo completo
     mon.crawling = crawl_task is not None              # el 1er escaneo profundo ya no repite lo que rastrea
     import restock
+    from storage import PriceStore, now_iso
     try:
         from storage import PriceStore
         with PriceStore(config.DB_PATH) as store:
@@ -158,6 +159,10 @@ async def run_loop(args) -> None:
                 rep = await mon.cycle(mode)
                 dirty = True
                 print_report(rep)
+                with PriceStore(config.DB_PATH) as store:        # 🔥 gangas que la app ya muestra -> Telegram
+                    pend = restock.pending_from_app(store)
+                    if pend:
+                        await mon.dispatch(store, pend, now_iso())
                 if mode == "deep":
                     last_deep = t0
             except Exception:  # noqa: BLE001

@@ -1,6 +1,7 @@
 """Reglas de alerta: bajadas, mínimos reales, ofertas falsas, precio objetivo, stock y 🦖 Godzilla."""
 from __future__ import annotations
 
+import json
 import re
 import statistics
 from dataclasses import dataclass, field
@@ -254,22 +255,45 @@ def bargain(store: PriceStore, p, gk: str | None, category: str) -> tuple[str, i
     refurb = fam.endswith(" reacond")
     base = fam.removesuffix(" reacond")
     rows = store.conn.execute(
-        "SELECT price, group_key FROM products WHERE key<>? AND missing_since IS NULL AND price>0 "
+        "SELECT price, group_key, name, badges FROM products WHERE key<>? AND missing_since IS NULL AND price>0 "
         "AND (group_key=? OR group_key LIKE ?)", (p.key, base, base + " %")).fetchall()
     exact = re.compile(re.escape(base) + r"( \d+gb)?$")              # solo equipos NUEVOS de ese modelo
-    prices = [r[0] for r in rows if exact.match(r[1] or "")]
+    # nuevo: mediana SIN revendedores del marketplace (inflan). Seminuevo: el nuevo más barato CON marketplace
+    # (así es más estricto). En ambos casos sin packs/bundles.
+    prices = [r[0] for r in rows if exact.match(r[1] or "") and ganga_ref_ok(r[2], r[3], marketplace_ok=refurb)]
     if not prices:
         return None
-    return bargain_vs(p.price, prices, refurb)
+    peers_rx = re.compile(re.escape(base) + r"( \d+gb)? reacond$")
+    peers = [r[0] for r in rows if refurb and peers_rx.match(r[1] or "") and ganga_ref_ok(r[2], r[3], True)]
+    return bargain_vs(p.price, prices, refurb, p.list_price, peers)
 
 
-def bargain_vs(price: int, new_prices: list[int], refurb: bool) -> tuple[str, int] | None:
+# Referencias que NO sirven para decir "esto cuesta X": revendedores del marketplace (inflan: un monitor Caixun de
+# $89.990 lo revenden a $219.990–289.990) y packs/bundles ("… + Sound Pocket"). Auditado con datos reales nov-2026.
+_BUNDLE = re.compile(r"\s\+\s*[a-záéíóú]|\bcon regalo\b|\bpack\b|\bbundle\b|\bcombo\b", re.I)
+
+
+def ganga_ref_ok(name: str | None, badges, marketplace_ok: bool = False) -> bool:
+    if isinstance(badges, str):
+        badges = json.loads(badges) if badges.startswith("[") else [badges]
+    mkt = any(str(b).startswith("Vendedor: ") for b in badges or [])
+    return (marketplace_ok or not mkt) and not _BUNDLE.search(name or "")
+
+
+def bargain_vs(price: int, new_prices: list[int], refurb: bool, list_price: int | None = None,
+               refurb_peers: list[int] | None = None) -> tuple[str, int] | None:
     """Regla pura de ganga (la usan las alertas y la app): precio vs mediana del modelo NUEVO."""
     if not new_prices or not price:
         return None
-    ref = statistics.median(new_prices)
+    # seminuevo: contra el equipo nuevo MÁS BARATO (los listados viejos guardan el precio de lanzamiento: un Galaxy S23
+    # "nuevo" a $1.199.990 haría parecer ganga un reacondicionado normal de $359.990)
+    ref = min(new_prices) if refurb else statistics.median(new_prices)
     if ref < config.GANGA_MIN_REF:
         return None
+    if refurb and refurb_peers and price >= statistics.median(refurb_peers) * 0.77:
+        return None              # otros seminuevos de ese modelo cuestan parecido: es su precio normal de reacondicionado
+    if list_price and not refurb and list_price < ref * 0.8:
+        return None              # la propia tienda dice que su precio normal es mucho menor: la referencia está inflada
     ratio = config.GANGA_REFURB_RATIO if refurb else config.GANGA_NEW_RATIO
     if len(new_prices) == 1:
         ratio *= 0.9                                                     # 1 sola referencia: más estricto

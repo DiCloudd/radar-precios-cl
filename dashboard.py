@@ -12,7 +12,7 @@ from pathlib import Path
 
 import config
 import godzilla
-from analysis import bargain_vs, fake_discount, family_key, predict
+from analysis import bargain_vs, fake_discount, family_key, ganga_ref_ok, predict
 from calendar_cl import active_event, upcoming
 from matcher import comparable
 from models import Product
@@ -55,6 +55,8 @@ def build_data(store: PriceStore) -> dict:
             "fake": fake_discount(obs, store) if prod.list_price else None,
         })
     _mark_gangas(products)
+    # la app y Telegram muestran las MISMAS gangas: el monitor avisa las que la app marca y aún no se avisaron
+    store.set_meta("gangas:app", {p["key"]: p["ganga"] for p in products if p["ganga"] and not p["missing"]})
     groups: dict[str, list] = {}
     for p in products:
         if p["group"] and not p["missing"]:
@@ -201,23 +203,34 @@ CORE_LIMIT = 2500
 def _mark_gangas(products: list[dict]) -> None:
     """🔥 p["ganga"] = {"why", "ref"} si está muy bajo lo que cuesta el modelo NUEVO (misma regla que las alertas,
     calculada en memoria: 1 pasada en vez de 1 consulta por producto)."""
-    new: dict[str, list[int]] = {}
+    new: dict[str, list[int]] = {}                  # nuevos sin marketplace (referencia de productos nuevos)
+    new_all: dict[str, list[int]] = {}              # nuevos con marketplace (referencia de seminuevos: el más barato)
+    used: dict[str, list[int]] = {}                 # seminuevos/reacondicionados por modelo
     fams = {}
     for p in products:
         fam = family_key(p["group"], p["cat"]) if p["group"] and not p["missing"] else None
         fams[p["key"]] = fam
-        if fam and not fam.endswith(" reacond"):
-            new.setdefault(fam, []).append(p["price"])
+        if fam and ganga_ref_ok(p["name"], p["badges"], marketplace_ok=True):
+            base = fam.removesuffix(" reacond")
+            if fam.endswith(" reacond"):
+                used.setdefault(base, []).append(p["price"])
+            else:
+                new_all.setdefault(base, []).append(p["price"])
+                if ganga_ref_ok(p["name"], p["badges"]):
+                    new.setdefault(base, []).append(p["price"])
     for p in products:
         p["ganga"] = None
         fam = fams[p["key"]]
         if not fam or any(b.startswith("Vendedor: ") for b in p["badges"] or []):
             continue
         refurb = fam.endswith(" reacond")
-        refs = list(new.get(fam.removesuffix(" reacond"), []))
-        if not refurb and p["price"] in refs:
+        refs = list((new_all if refurb else new).get(fam.removesuffix(" reacond"), []))
+        if not refurb and p["price"] in refs and ganga_ref_ok(p["name"], p["badges"]):
             refs.remove(p["price"])                     # no compararse consigo mismo
-        hit = bargain_vs(p["price"], refs, refurb)
+        peers = list(used.get(fam.removesuffix(" reacond"), [])) if refurb else None
+        if peers and p["price"] in peers:
+            peers.remove(p["price"])
+        hit = bargain_vs(p["price"], refs, refurb, p.get("list"), peers)
         if hit:
             p["ganga"] = {"why": hit[0], "ref": hit[1]}
 

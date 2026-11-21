@@ -203,3 +203,62 @@ def test_lenovo_parse_and_page_url():
     url = LenovoScraper().page_url("https://www.lenovo.com/cl/es/notebooks/#7ca29953", 2)
     assert "pageFilterId=7ca29953" in url and "%2522page%2522%253A%25222%2522" in url
     assert url.endswith("#https://www.lenovo.com/cl/es/notebooks/")
+
+
+# ---------------------------------------------------------------- 🔥 falsos positivos de gangas (auditados con datos reales)
+def _mk(key, name, price, group, cat="celulares", badges=(), lst=None):
+    return {"key": key, "name": name, "price": price, "group": group, "cat": cat, "missing": None,
+            "badges": list(badges), "list": lst}
+
+
+def test_marketplace_resellers_do_not_inflate_reference():
+    from dashboard import _mark_gangas
+    items = [_mk("pc", 'Monitor Caixun 24", FHD, IPS, 100Hz, 5ms, C24X3F', 79_990, "c24x3f", "monitores", lst=149_990),
+             _mk("f1", "Monitor De Oficina 24 Pulgadas C24X3F", 219_990, "c24x3f", "monitores", ["Vendedor: Delirius Spa"]),
+             _mk("f2", "Monitor Oficina 24 FHD C24X3F", 289_990, "c24x3f", "monitores", ["Vendedor: 2vision"])]
+    _mark_gangas(items)
+    assert not items[0]["ganga"]
+
+
+def test_own_list_price_below_reference_is_not_ganga():
+    from analysis import bargain_vs
+    assert bargain_vs(79_990, [219_990, 289_990], False) and not bargain_vs(79_990, [219_990, 289_990], False, 149_990)
+
+
+def test_bundles_are_not_reference():
+    from analysis import ganga_ref_ok
+    assert not ganga_ref_ok("Xiaomi Redmi Note 14 Pro 5G 256GB + Sound Pocket", None)
+    assert ganga_ref_ok("Redmi Note 17 Pro+ 512GB", None)              # "Pro+" es el modelo, no un pack
+
+
+def test_refurb_uses_cheapest_new_and_refurb_peers():
+    from dashboard import _mark_gangas
+    items = [_mk("e", "Samsung Galaxy S23 5G 128GB", 1_199_990, "samsung galaxy s23 128gb"),          # listado viejo
+             _mk("m", "Galaxy S23 128GB Negro", 439_990, "samsung galaxy s23 128gb", badges=["Vendedor: Tamia"]),
+             _mk("h", "Samsung Galaxy S23 128gb Black - Reacondicionado", 359_990, "samsung galaxy s23 128gb reacond")]
+    _mark_gangas(items)
+    assert not items[2]["ganga"]                                        # 82 % del nuevo más barato: precio normal
+    items = [_mk("n", "Xiaomi 14T Pro 512GB", 569_990, "xiaomi 14t pro 512gb"),
+             _mk("r", "Xiaomi 14T Pro 512GB Seminuevo", 199_990, "xiaomi 14t pro 512gb reacond"),
+             _mk("r2", "14T Pro 512GB Reacondicionado", 549_990, "xiaomi 14t pro 512gb reacond", badges=["Vendedor: X"])]
+    _mark_gangas(items)
+    assert items[1]["ganga"]                                            # el caso real de Entel sigue detectándose
+
+
+def test_app_gangas_are_announced_once(store):
+    seed_new(store)
+    p = P("Xiaomi 14 Ultra 5G 512GB Seminuevo", 299_990, "e:9", in_stock=True)
+    store.observe(p, group_key(p.name, p.brand), SRC.name, ts(1))
+    store.set_meta("gangas:app", {"e:9": {"why": "63% más barato", "ref": 799_990}})
+    a = restock.pending_from_app(store)
+    assert [x.kind for x in a] == ["ganga"]
+    store.add_alert("e:9", "ganga", 299_990, "x", ts(0))
+    assert restock.pending_from_app(store) == []                        # ya avisada: no se repite
+
+
+def test_app_gangas_sold_out_go_to_watch(store):
+    seed_new(store)
+    p = P("Xiaomi 14 Ultra 5G 512GB Seminuevo", 299_990, "e:10", in_stock=False)
+    store.observe(p, group_key(p.name, p.brand), SRC.name, ts(1))
+    store.set_meta("gangas:app", {"e:10": {"why": "63% más barato", "ref": 799_990}})
+    assert [x.kind for x in restock.pending_from_app(store)] == ["restock_watch"] and "e:10" in restock.load(store)

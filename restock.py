@@ -26,7 +26,7 @@ from matcher import group_key
 from fetchers import BlockedError, RobotsDisallowed, jittered
 from models import ScrapeResult
 from scrapers import SCRAPERS, SITE_LABELS
-from storage import Observation, PriceStore, now_iso
+from storage import Observation, PriceStore, ago, now_iso
 
 log = logging.getLogger("restock")
 
@@ -128,6 +128,42 @@ def seed_message(added: list[dict]) -> str:
     if len(added) > 25:
         lines.append(f"… y {len(added) - 25} más (pestaña Ofertas → 🚨 Agotadas en vigilancia)")
     return "\n".join(lines)
+
+
+def pending_from_app(store: PriceStore) -> list[Alert]:
+    """Gangas que la app marca (dashboard.py guarda "gangas:app") y que Telegram todavía no avisó en 7 días.
+    Pasa cuando la ganga aparece por un cambio de la REFERENCIA (otra tienda subió) o en un 1er barrido silencioso.
+    Con stock -> 🔥 GANGA; agotada -> entra a vigilancia y 👀 aviso."""
+    from models import Product
+    marked = store.get_meta("gangas:app", {}) or {}
+    watch, out = load(store), []
+    since = ago(days=7)
+    for key, g in marked.items():
+        r = store.conn.execute("SELECT * FROM products WHERE key=?", (key,)).fetchone()
+        if not r or r["missing_since"] or key.startswith("url:"):
+            continue
+        sold_out = r["in_stock"] == 0
+        kinds = ("restock_watch", "restock", "ganga") if sold_out else ("ganga", "restock", "price_error", "godzilla")
+        done = store.conn.execute(
+            f"SELECT 1 FROM alerts WHERE key=? AND ts>=? AND kind IN ({','.join('?' * len(kinds))}) LIMIT 1",
+            (key, since, *kinds)).fetchone()
+        if sold_out and key not in watch:
+            watch[key] = {"name": r["name"][:90], "site": r["site"], "price": r["price"], "ref": g["ref"],
+                          "reason": g["why"], "since": now_iso(), "found_at": None, "source": r["source"],
+                          "image": r["image"], "url": r["url"]}
+        if done:
+            continue
+        p = Product(key, r["site"], r["name"], r["url"], r["price"], list_price=r["list_price"],
+                    card_price=r["card_price"], brand=r["brand"], image=r["image"],
+                    in_stock=None if r["in_stock"] is None else bool(r["in_stock"]), installments=r["installments"])
+        obs = Observation(p, r["price"], r["list_price"], None, r["first_seen"], p.in_stock, False)
+        if sold_out:
+            out.append(Alert("restock_watch", obs, "👀 GANGA AGOTADA: la vigilo",
+                             [g["why"], "Te aviso apenas vuelva el stock 🚨"], 2, g["ref"]))
+        else:
+            out.append(Alert("ganga", obs, "🔥 GANGA", [g["why"]], 1, g["ref"]))
+    store.set_meta(META, prune(watch))
+    return out
 
 
 class RestockWatcher:
