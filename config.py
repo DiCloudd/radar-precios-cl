@@ -58,6 +58,7 @@ ERROR_MIN_LIST = _float("ERROR_MIN_LIST", 150000)      # ...solo si el precio no
 ERROR_EXTREME_PCT = _float("ERROR_EXTREME_PCT", 80)     # 💥 producto NUEVO con -80 % o más…
 ERROR_EXTREME_LIST = _float("ERROR_EXTREME_LIST", 400000)  # …sobre un precio normal ≥ $400.000
 PRICE_ERROR_RATIO = _float("PRICE_ERROR_RATIO", 0.45) # precio < 45% de la mediana entre tiendas
+FAMILY_ERROR_MIN_REF = _float("FAMILY_ERROR_MIN_REF", 100_000)   # bajo esto la regla "vs su familia" no aplica
 FAKE_LIST_RAISE_PCT = _float("FAKE_LIST_RAISE_PCT", 10)
 MISSING_HOURS = _float("MISSING_HOURS", 6)
 ALERT_COOLDOWN_HOURS = _float("ALERT_COOLDOWN_HOURS", 12)

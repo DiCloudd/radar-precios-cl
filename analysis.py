@@ -102,6 +102,17 @@ STORE_CAT_ACCESSORY = re.compile(r"correa|pulsera|anillo|funda|carcasa|protector
                                  r"soundbar|\bacc\.|accesori", re.I)
 
 
+# 📷 cámaras y drones (auditado nov-2026): kits de protección, filtros ND, lentes sueltos
+_CAM_ACCESSORY = re.compile(r"protecci[oó]n|\bfilters?\b|\bnd-?(pl|\d)|\bnd ?filter|\bgimbal\b(?!.*\bc[aá]mara)|"
+                            r"h[eé]lices?|propellers?|\bcarcasa\b|\bmontura\b|\bflash\b(?!.*c[aá]mara)", re.I)
+_LENS = re.compile(r"\b\d{1,3}(-\d{1,3})?\s?mm\b.*\bf/?\d|\blente\b|\bobjetivo\b", re.I)
+_CAM_BODY = re.compile(r"c[aá]mara|camera|\beos\b|\balpha\b|\ba6\d00\b|\ba7|nikon z|lumix|fujifilm x|powershot|"
+                       r"\bkit\b", re.I)
+# 🛴 accesorios de scooters que la tienda lista junto a los scooters
+_MOBILITY_ACCESSORY = re.compile(r"\b(seat|asiento|casco|helmet|neum[aá]tico|tire|c[aá]mara de aire|guardabarro|"
+                                 r"cargador|bater[ií]a externa)\b", re.I)
+
+
 def _multi_generation(name: str) -> bool:
     """Un producto real es de UN modelo; los accesorios listan compatibilidades ("Watch9 Watch8", "iPhone 15/16")."""
     if _GEN_SLASH.search(name):
@@ -119,8 +130,16 @@ def is_accessory(name: str, category: str = "", store_category: str | None = Non
     if category == "audifonos":                          # ahí "audífonos" es el producto
         head = re.sub(r"aud[ií]fonos?", " ", head, flags=re.I)
         sc = re.sub(r"acc\.[\w.]*|accesori\w*", " ", sc, flags=re.I)
-    if category == "camaras":                            # "Kit Cámara Canon R50": el kit ES la cámara
-        head = re.sub(r"\bkit\b", " ", head, flags=re.I)
+    if category == "camaras":
+        if re.search(r"\bkit\s+(de\s+)?(c[aá]mara|canon|sony|nikon|fuji\w*|eos|alpha|lumix)", head, re.I):
+            head = re.sub(r"\bkit\b", " ", head, flags=re.I)   # "Kit Cámara Canon R50": el kit ES la cámara
+        if _CAM_ACCESSORY.search(name):
+            return True
+        # un lente suelto ("XC 13-33mm f3.5-6.3 OIS") no es una cámara; un kit cámara + lente sí
+        if _LENS.search(name) and not _CAM_BODY.search(name):
+            return True
+    if category == "movilidad" and _MOBILITY_ACCESSORY.search(name):
+        return True
     return bool(ACCESSORY.search(head) or NON_PRODUCT.search(name) or _multi_generation(name)
                 or (sc and STORE_CAT_ACCESSORY.search(sc)))
 
@@ -145,9 +164,10 @@ TOO_CHEAP = {
     # solo marcas reales: los monitores genéricos de 7" para auto o de 19" cuestan $40–60k de verdad
     "monitores": (re.compile(r"\b(samsung|odyssey|lg|ultragear|asus|\brog\b|\btuf\b|aoc|dell|alienware|lenovo|msi|"
                              r"gigabyte|philips|viewsonic|benq|xiaomi|hp|acer|predator)\b", re.I), 40_000),
-    "camaras": (re.compile(r"\beos\b|\balpha\b|\ba6\d00\b|\ba7|\blumix\b|nikon z|\bz ?(5|6|8|9|30|50|fc)\b|"
-                           r"fujifilm x|\bx-?(t|s|h)\d|gopro|\bhero ?1\d|osmo|dji (mini|air|mavic|avata|neo|flip)|"
-                           r"\bmavic\b|insta360|powershot", re.I), 100_000),
+    # con MARCA siempre: "Drone Quadcopter Ls-xt6" no es una Fujifilm X-T (auditado)
+    "camaras": (re.compile(r"canon.*\beos\b|\beos r\d|sony.*\b(alpha|a6\d00|a7)|\bilce-|\blumix\b|nikon z|"
+                           r"fuji\w*.*\bx-?(t|s|h)\d|fujifilm x|gopro|\bhero ?1\d|dji|\bmavic\b|insta360|"
+                           r"powershot", re.I), 100_000),
     "impresion3d": (re.compile(r"impresora 3d.*(bambu|creality|elegoo|anycubic|prusa|flashforge|ender|halot|k1|"
                                r"mars|saturn|kobra)|bambu lab", re.I), 60_000),
     "movilidad": (re.compile(r"scooter|monopat[ií]n|bicicleta el[eé]ctrica", re.I), 80_000),
@@ -166,13 +186,22 @@ TIERS = {
                 (re.compile(r"lavadora secadora|lavaseca", re.I), 200_000)],   # auditado: lavaseca 10/6 kg ≈ $290k
     "tablets": [(re.compile(r"ipad pro|galaxy tab s\d+ ?ultra|tab s1\d", re.I), 300_000)],
     "monitores": [(re.compile(r"\boled\b|\b4k\b|\buhd\b|\b(3[2-9]|4\d)\s*(\"|''|”|pulg)|\b(2[4-9]\d|3\d\d|4\d\d) ?hz", re.I), 120_000)],
-    "camaras": [(re.compile(r"\ba7|eos r[1-8]\b|nikon z ?[5-9]|\bz ?[6-9]\b|x-?t[45]|mavic|dji air|avata", re.I), 500_000),
-                (re.compile(r"eos r(10|50|100)|\ba6\d00|z ?(30|50|fc)|x-?s20|dji mini|osmo pocket", re.I), 250_000)],
+    "camaras": [(re.compile(r"\ba7\s?(iv|v|r|s|c)|eos r[1-8]\b|nikon z ?[5-9]\b|fuji\w*.*x-?t[45]|mavic \d|dji air|"
+                            r"avata", re.I), 500_000),
+                (re.compile(r"eos r(10|50|100)|\ba6\d00|nikon z ?(30|50|fc)|x-?s20|dji mini|osmo pocket", re.I), 250_000)],
 }
 WHAT = {"consolas": "una consola", "notebooks": "un notebook", "televisores": "un televisor", "celulares": "un celular",
         "tablets": "una tablet", "audifonos": "unos audífonos", "smartwatches": "un smartwatch",
         "electro": "un electrodoméstico", "monitores": "un monitor", "camaras": "una cámara/dron",
         "impresion3d": "una impresora 3D", "movilidad": "un scooter eléctrico"}
+
+
+def category_floor(name: str, category: str, store_category: str | None = None) -> int | None:
+    """Piso de precio del producto (categoría + gama) si es reconocible; None si no lo es o es accesorio."""
+    rule = TOO_CHEAP.get(category)
+    if not rule or is_accessory(name, category, store_category) or not rule[0].search(name or ""):
+        return None
+    return max([rule[1]] + [f for rx, f in TIERS.get(category, []) if rx.search(name or "")])
 
 
 def too_cheap(name: str, category: str, price: int, list_price: int | None = None,
@@ -230,13 +259,19 @@ def family_error(store: PriceStore, p, gk: str | None, category: str) -> tuple[s
         return None
     base, suffix = (fam.removesuffix(" reacond"), " reacond") if fam.endswith(" reacond") else (fam, "")
     rows = store.conn.execute(
-        "SELECT price, group_key FROM products WHERE key<>? AND missing_since IS NULL AND price>0 "
+        "SELECT price, group_key, name, badges FROM products WHERE key<>? AND missing_since IS NULL AND price>0 "
         "AND (group_key=? OR group_key LIKE ?)", (p.key, fam, base + " %")).fetchall()
     exact = re.compile(re.escape(base) + r"( \d+gb)?" + re.escape(suffix) + "$")
-    prices = [r[0] for r in rows if exact.match(r[1] or "")]
+    # sin revendedores del marketplace ni packs: inflan la referencia (auditado: WF-1000XM5 "vale" $679.592, un
+    # monitor Caixun $219.990, unos Philips TAT1109 $99.990)
+    prices = [r[0] for r in rows if exact.match(r[1] or "") and ganga_ref_ok(r[2], r[3])]
     if not prices:
         return None
     ref = statistics.median(prices)
+    if ref < config.FAMILY_ERROR_MIN_REF:
+        return None                     # genéricos baratos (audífonos de $10–30k): mucho ruido, poco valor
+    if p.list_price and p.list_price < ref * 0.8:
+        return None                     # la propia tienda dice que su "normal" es mucho menor: referencia inflada
     ratio = config.PRICE_ERROR_RATIO if len(prices) >= 2 else config.PRICE_ERROR_RATIO * 0.75   # 1 sola ref: más estricto
     if p.price < ref * ratio:
         return f"{(1 - p.price / ref) * 100:.0f}% bajo lo que cuesta este modelo en el catálogo ({clp(int(ref))})", int(ref)
@@ -323,9 +358,12 @@ def price_error_reasons(p, category: str, check_card: bool = True, is_new: bool 
     discount_ok = (not is_new and not refurb and drop_pct >= 30 and p.list_price and p.list_price >= config.ERROR_MIN_LIST
                    and p.discount_pct and p.discount_pct >= config.ERROR_DISCOUNT_PCT and not _marketplace(p))  # capa 6
     # descuento EXTREMO en un producto caro: ni las tiendas que inflan el "normal" llegan a -80 % (máx. visto: -76 %)
+    # …y solo si el producto es reconocible y su precio está cerca del piso de su gama: un "normal" absurdo
+    # (Hites: monitor Legion 25i a $179.990 "normal $999.990") no basta por sí solo.
+    floor = category_floor(p.name, category, sc)
     discount_ok = discount_ok or bool(
         is_new and not refurb and not _marketplace(p) and p.list_price and p.list_price >= config.ERROR_EXTREME_LIST
-        and p.discount_pct and p.discount_pct >= config.ERROR_EXTREME_PCT)
+        and p.discount_pct and p.discount_pct >= config.ERROR_EXTREME_PCT and floor and p.price < floor * 2)
     if discount_ok:
         out.append(f"-{p.discount_pct:.0f}% sobre su precio normal ({clp(p.list_price)})")
     elif cheap:

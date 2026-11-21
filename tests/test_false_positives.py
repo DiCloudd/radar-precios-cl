@@ -94,3 +94,61 @@ def test_generic_earbuds_are_not_premium(name, price):
                                   "Audífonos Bose QuietComfort Ultra"])
 def test_branded_premium_earbuds_still_detected(name):
     assert price_error_reasons(P(name, 9990), "audifonos", is_new=True)
+
+
+# ---------------------------------------------------------------- auditoría en la nube del 21-11-2026 (22.756 productos)
+from analysis import family_error, price_error_reasons as _per  # noqa: E402
+from models import Product as _P  # noqa: E402
+from storage import PriceStore  # noqa: E402
+
+
+@pytest.mark.parametrize("name,cat,price", [
+    ("Kit de Protección Completo para Cámara Insta360 X4", "camaras", 40_990),
+    ("Drone Quadcopter Ls-xt6 Doble Cámara 4k Y Wifi - SC", "camaras", 77_890),
+    ("Mavic 3 Filters Set ND-PL ( 8/16/32/64 )", "camaras", 134_990),
+    ("XC 13-33mm f3.5-6.3 OIS Caja blanca", "camaras", 281_990),
+    ("Xiaomi Electric Scooter 5 Plus Seat (desde)", "movilidad", 49_990),
+])
+def test_audit_new_categories_not_errors(name, cat, price):
+    assert _per(_P("x:1", "falabella", name, "u", price), cat) == []
+
+
+def test_absurd_list_price_alone_is_not_error():
+    p = _P("h:1", "hites", 'Monitor Gamer Legion 25i Wled 24.5"', "u", 179_990, list_price=999_990)
+    assert _per(p, "monitores") == []
+    real = _P("f:1", "falabella", "Apple iPhone 17 Pro Max 256GB", "u", 299_990, list_price=1_599_990)
+    assert _per(real, "celulares")                                     # el error real sigue saltando
+
+
+def test_real_cameras_still_detected():
+    assert _per(_P("c:1", "falabella", "Camara Canon EOS R50 18-45 Is Stm", "u", 99_990), "camaras")
+    assert _per(_P("c:2", "falabella", "Drone DJI Mini 4 Pro Fly More", "u", 89_990), "camaras")
+
+
+def _fam_store(tmp_path, refs, cat="audifonos"):
+    s = PriceStore(tmp_path / "f.db")
+    for i, (price, badges) in enumerate(refs):
+        s.observe(_P(f"r:{i}", "falabella", "Sony WF-1000XM5", "u", price, badges=badges), "sony wf1000xm5", "src",
+                  category=cat)
+    return s
+
+
+def test_family_error_ignores_marketplace_resellers(tmp_path):
+    s = _fam_store(tmp_path, [(679_592, ["Vendedor: X"]), (699_990, ["Vendedor: Y"]), (289_990, [])])
+    p = _P("n:1", "falabella", "WF-1000XM5 Audífonos Inalámbricos", "u", 263_990, list_price=290_389)
+    assert family_error(s, p, "sony wf1000xm5", "audifonos") is None
+    s.close()
+
+
+def test_family_error_skips_cheap_generics(tmp_path):
+    s = _fam_store(tmp_path, [(28_990, []), (29_990, [])])
+    p = _P("n:2", "falabella", "Audífono In-ear Inalámbrico Yyk-520", "u", 9_890)
+    assert family_error(s, p, "sony wf1000xm5", "audifonos") is None
+    s.close()
+
+
+def test_family_error_positive_control(tmp_path):
+    s = _fam_store(tmp_path, [(679_990, []), (699_990, [])])            # tiendas reales, sin revendedores
+    p = _P("n:3", "falabella", "Sony WF-1000XM5", "u", 199_990)
+    assert family_error(s, p, "sony wf1000xm5", "audifonos")            # la regla sigue viva (no pasa por vacío)
+    s.close()
