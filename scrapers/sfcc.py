@@ -38,11 +38,12 @@ class AbcScraper(_SFCC):
             price = internet or normal or card
             if not pid or not price:
                 continue
-            name, brand = "", None
+            name, brand, scat = "", None, None
             box = tile.css_first("[data-gtm]")
             try:
                 imp = json.loads(html.unescape(box.attributes.get("data-gtm", "")))["ecommerce"]["impressions"]
                 name, brand = imp.get("name", ""), imp.get("brand")
+                scat = html.unescape(imp.get("category") or "") or None   # "Sales Catalog > Tecnología > … > Smartphones"
             except (AttributeError, KeyError, TypeError, json.JSONDecodeError):
                 img = tile.css_first("img[alt]")
                 name = img.attributes.get("alt", "") if img else ""
@@ -55,7 +56,8 @@ class AbcScraper(_SFCC):
                 list_price=normal if normal and normal > price else None,
                 card_price=card if card and card < price else None, brand=brand,
                 image=img.attributes.get("src") if img else None,
-                badges=[f"-{badge.text(strip=True)}"] if badge and badge.text(strip=True) else []))
+                badges=[f"-{badge.text(strip=True)}"] if badge and badge.text(strip=True) else [],
+                store_category=scat))
         return PageResult(out, "SFCC tiles .price-value[data-value]")
 
 
@@ -85,5 +87,8 @@ class HitesScraper(_SFCC):
                 list_price=max(nums) if nums and max(nums) > price else None,
                 card_price=card if card and card < price else None, brand=item.get("item_brand"),
                 image=img.attributes.get("src") if img else None,
-                badges=[item["promotion_name"].strip()] if (item.get("promotion_name") or "").strip() else []))
+                badges=[item["promotion_name"].strip()] if (item.get("promotion_name") or "").strip() else [],
+                # Hites informa la categoría real ("Correas", "Smartphone"...) y su familia de reporte
+                store_category=" > ".join(str(item.get(k)) for k in ("item_category", "item_category2", "item_category3",
+                                                                    "report_familia") if item.get(k)) or None))
         return PageResult(out, "SFCC tiles data-gtmselectitem")

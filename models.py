@@ -21,6 +21,7 @@ class Product:
     installments: int | None = None   # cuotas sin interés si la tienda lo informa
     badges: list[str] = field(default_factory=list)  # etiquetas de promo ("Cyber", "Envío gratis"...)
     found_at: str | None = None       # URL de la página donde apareció (para re-verificar errores)
+    store_category: str | None = None # categoría que informa la tienda ("Correas", "Accesorios"...) -> anti falsos positivos
 
     @property
     def discount_pct(self) -> float | None:

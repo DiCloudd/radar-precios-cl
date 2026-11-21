@@ -18,3 +18,9 @@ jobs:
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r requirements.txt
       - run: python main.py --selftest
+      - name: Auditoría de falsos positivos y sensibilidad (catálogo real publicado)
+        run: |
+          git fetch -q --depth 1 origin gh-pages
+          git show origin/gh-pages:data/prices.db.gz | gunzip > /tmp/audit.db
+          python tools/audit_alerts.py /tmp/audit.db | tee /tmp/audit.txt
+          grep -q "FALSOS POSITIVOS (alertarían HOY como producto nuevo): 0 " /tmp/audit.txt || (echo "::warning::Hay falsos positivos nuevos: revisa la auditoría"; exit 1)

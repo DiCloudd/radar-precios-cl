@@ -53,16 +53,79 @@ def is_real_historic_low(obs: Observation) -> bool:
             and _hours_since(obs.first_seen) >= config.MIN_HISTORY_HOURS)
 
 
+# ============================================================================================
+#  🛡️ ANTI FALSOS POSITIVOS. Un "error de precio" solo se avisa si el producto ES lo que parece.
+#  Capa 1: tipo al inicio del título      ("Funda…", "Sport Band…", "Control…", "Lámina…")
+#  Capa 2: señales en cualquier parte      ("…para iPhone 17", "compatible", "gift card", "12 meses", "repuesto")
+#  Capa 3: compatibilidad multi-modelo     ("Watch9 Watch8", "iPhone 15/16", "S24 S25")
+#  Capa 4: categoría que informa la tienda ("Correas", "Accesorios", "Videojuegos")
+#  Capa 5: precio normal de la tienda      (si su "normal" ya es barato, no es un producto caro mal etiquetado)
+#  Capa 6: vendedores del marketplace       (sus "precios normales" inflados no cuentan como descuento real)
+# ============================================================================================
 ACCESSORY = re.compile(
-    r"l[aá]mina|funda|carcasa|\bcase\b|estuche|protector|cargador|cable|adaptador|soporte|\bbase\b|mochila|bolso|"
-    r"malet[ií]n|mouse|teclado|skin|film|vidrio|templad|control|joystick|\bjuegos?\b|repuesto|bater[ií]a|aud[ií]fonos?|"
-    r"parlante|\bkit\b|accesorio|correa|malla|stand|\bhub\b|docking|memoria|disco|pendrive|antena|\brack\b|limpia|"
-    r"l[aá]piz|stylus|tarjeta|gift|retro|tetris|pel[ií]cula|repisa|mueble|lente|cooler|ventilador|sticker|cubre|"
-    r"organizador|filtro|manguera|bandeja|frigobar|minibar|repelente|\bband\b|pulsera|strap|cargador|dock|"
-    r"protector|mica|cristal templado", re.I)
+    r"l[aá]mina|funda|carcasa|\bcases?\b|\bcover\b|estuche|protector|\bmica\b|hidrogel|vidrio|templad|\bfilm\b|"
+    r"cargador|cable|adaptador|convertidor|\bhub\b|\bdock|soporte|\bbase\b|\bstand\b|tr[ií]pode|selfie|holder|"
+    r"correa|\bbands?\b|malla|pulsera|strap|mochila|bolso|malet[ií]n|sleeve|teclado|mouse|alfombrilla|mousepad|"
+    r"aud[ií]fonos?|parlante|control|joystick|\bmando|volante|joy-?con|dualsense|cooler|ventilador|disipador|"
+    r"skin|sticker|vinilo|\bkit\b|limpia|l[aá]piz|stylus|pencil|puntero|repuesto|bater[ií]a|power ?bank|"
+    r"memoria|tarjeta|pendrive|disco|\bssd\b|antena|decodificador|\brack\b|mueble|repisa|cubre|organizador|"
+    r"filtro|manguera|bandeja|frigobar|minibar|accesorio|\bjuegos?\b|videojuego|pel[ií]cula|amiibo|figura|"
+    r"peluche|\bcartas?\b|gift|retro|tetris|lente|repelente|extensi[oó]n|regleta|enchufe|transformador|"
+    r"pantalla de repuesto|\btapa\b|servicio|instalaci[oó]n", re.I)
+NON_PRODUCT = re.compile(
+    r"\bpara (el |la |tu |los |las )?(iphone|ipad|galaxy|samsung|xiaomi|redmi|poco|motorola|moto|huawei|honor|oppo|"
+    r"vivo|realme|pixel|macbook|apple|airpods|watch|ps[45]|playstation|xbox|nintendo|switch|tv|televisor|smart ?tv|"
+    r"notebook|laptop|tablet|refrigerador|lavadora|smartwatch|reloj|celular|consola)|"
+    r"compatible (con|para) (el |la )?(iphone|ipad|galaxy|samsung|apple|airpods|ps[45]|xbox|switch|watch|macbook)|"
+    r"\bfor (iphone|samsung|galaxy|apple|ipad|airpods|ps5|xbox|switch)|repuesto|gift ?card|tarjeta de regalo|"
+    r"c[oó]digo digital|\bdigital code\b|suscripci[oó]n|membres[ií]a|garant[ií]a extendida|seguro de|"
+    r"(plus|pass|ultimate|essential|extra|premium|online)\s*\d+\s*meses|\d+\s*meses de (suscrip|membres|"
+    r"playstation|xbox|nintendo|game)|solo caja|caja vac[ií]a|dummy|maqueta|de exhibici[oó]n|game ?pass|"
+    r"photography kit|kit (pro|fotogr[aá]fico|de c[aá]mara)\b|"
+    # correas en cualquier parte del nombre ("Galaxy Watch7 Fabric Band", "Sport Loop", "Correa de silicona")
+    r"\b(fabric|sport|silicone|silicona|nylon|milanese|milanesa|link|leather|cuero|metal|trail|alpine|ocean|solo|"
+    r"braided|magn[eé]tica)\s+(band|loop|correa|malla)\b|\b(band|loop) (de|para)\b|"
+    # juegos con formato "Título - Playstation 3" y plataformas antiguas (no son consolas actuales)
+    r"\s[-–]\s*(playstation|ps[1-5]|xbox( one| 360| series [xs])?|nintendo( switch)?|switch)\s*\d?\s*$|"
+    r"\b(ps[123]|playstation [123]|psp|ps vita|xbox 360|wii u?|nintendo (ds|3ds|wii))\b", re.I)
+REFURB = re.compile(r"reacondicionad|seminuev|refurb|open ?box|usad[oa]|outlet|caja abierta|exhibici[oó]n|"
+                    r"grado [abc]\b|\bcpo\b", re.I)
+_GEN = re.compile(r"\b(watch|iphone|ipad|galaxy s|s|a|z ?flip|z ?fold|pixel|airpods|buds|fit|series)\s?(\d{1,2})\b", re.I)
+_GEN_SLASH = re.compile(r"\b(iphone|galaxy|watch|s|a|pixel)\s?\d{1,2}\s*/\s*\d{1,2}\b", re.I)
+# Verificado con datos reales (nov-2026): Hites usa "Pulseras", "Anillos", "CONTROLES", "ACC.ELECT.MENOR";
+# Abc mete "Soundbar" en Smart TV. OJO: las consolas de Hites van bajo "VideoJuegos" y TODOS sus audífonos
+# bajo "ACC.ELECT.MENOR", por eso "juego" no cuenta y "acc./accesorio" no aplica a la categoría audífonos.
+STORE_CAT_ACCESSORY = re.compile(r"correa|pulsera|anillo|funda|carcasa|protector|cargador|\bcables?\b|repuesto|"
+                                 r"consumible|\bcontrol(es)?\b|joystick|gift|tarjeta|suscrip|mueble|soporte|"
+                                 r"soundbar|\bacc\.|accesori", re.I)
+
+
+def _multi_generation(name: str) -> bool:
+    """Un producto real es de UN modelo; los accesorios listan compatibilidades ("Watch9 Watch8", "iPhone 15/16")."""
+    if _GEN_SLASH.search(name):
+        return True
+    fams: dict[str, set] = {}
+    for fam, num in _GEN.findall(name):
+        fams.setdefault(re.sub(r"\s", "", fam.lower()), set()).add(num)
+    return any(len(nums) >= 2 for nums in fams.values())
+
+
+def is_accessory(name: str, category: str = "", store_category: str | None = None) -> bool:
+    name = name or ""
+    head = " ".join(name.split()[:3])
+    sc = store_category or ""
+    if category == "audifonos":                          # ahí "audífonos" es el producto
+        head = re.sub(r"aud[ií]fonos?", " ", head, flags=re.I)
+        sc = re.sub(r"acc\.[\w.]*|accesori\w*", " ", sc, flags=re.I)
+    return bool(ACCESSORY.search(head) or NON_PRODUCT.search(name) or _multi_generation(name)
+                or (sc and STORE_CAT_ACCESSORY.search(sc)))
+
+
 # (patrón que confirma que ES el producto, precio por debajo del cual huele a error)
 TOO_CHEAP = {
-    "consolas": (re.compile(r"playstation|\bps[45]\b|xbox|nintendo|switch|steam deck|rog ally|legion go", re.I), 150_000),
+    # solo consolas actuales: las antiguas/retro sí son baratas
+    "consolas": (re.compile(r"playstation 5|\bps5\b|xbox series|nintendo switch|switch (2|oled|lite)|steam deck|"
+                            r"rog ally|legion go", re.I), 150_000),
     "notebooks": (re.compile(r"lenovo|\bhp\b|asus|acer|dell|macbook|galaxy book|\bmsi\b|huawei|gigabyte|lg gram|thinkpad|"
                              r"ideapad|vivobook|zenbook|aspire|inspiron|pavilion|victus|omen|legion|\btuf\b|\brog\b", re.I), 150_000),
     "televisores": (re.compile(r"\b(tv|televisor|smart ?tv)\b", re.I), 100_000),
@@ -74,79 +137,162 @@ TOO_CHEAP = {
                                 r"huawei watch (gt|\d)|amazfit (gtr|balance|t-rex)", re.I), 50_000),
     "electro": (re.compile(r"refrigerador|lavadora|secadora|side by side|french door|no frost", re.I), 100_000),
 }
+# Mínimos escalonados por gama (el mínimo fijo de la categoría es bajo para equipos de $1,5–3 M).
+TIERS = {
+    "celulares": [(re.compile(r"pro max|\bultra\b|z ?fold|iphone 1[7-9] pro|iphone air", re.I), 400_000),
+                  (re.compile(r"iphone 1[6-9]|galaxy s2[5-9]|z ?flip|pixel [89]|xiaomi 1[5-9]", re.I), 250_000)],
+    "notebooks": [(re.compile(r"macbook pro|rtx ?50[789]0|rtx ?40[789]0|\bi9\b|i9-|ryzen 9|legion|rog strix|"
+                              r"\bomen\b|zenbook s|xps|alienware", re.I), 400_000),
+                  (re.compile(r"macbook air|\brtx\b|gaming|gamer|\btuf\b|victus|nitro|loq", re.I), 300_000)],
+    "consolas": [(re.compile(r"ps5 pro|playstation 5 pro|switch 2|rog ally x|legion go", re.I), 300_000)],
+    # OJO: QLED/Mini LED de 43–55" cuestan ~$200k (auditado): solo 65"+ y OLED de verdad suben el mínimo
+    "televisores": [(re.compile(r"\b(6[5-9]|[7-9]\d|1\d\d)\s*(\"|''|”|pulg)|\boled\b|neo ?qled", re.I), 200_000)],
+    "electro": [(re.compile(r"french door|side by side", re.I), 300_000),
+                (re.compile(r"lavadora secadora|lavaseca", re.I), 200_000)],   # auditado: lavaseca 10/6 kg ≈ $290k
+    "tablets": [(re.compile(r"ipad pro|galaxy tab s\d+ ?ultra|tab s1\d", re.I), 300_000)],
+}
+WHAT = {"consolas": "una consola", "notebooks": "un notebook", "televisores": "un televisor", "celulares": "un celular",
+        "tablets": "una tablet", "audifonos": "unos audífonos", "smartwatches": "un smartwatch",
+        "electro": "un electrodoméstico"}
 
 
-def is_accessory(name: str, category: str = "") -> bool:
-    """Las tiendas titulan los accesorios empezando por su tipo ("Funda…", "Lámina…", "Control…").
-    Solo se miran las 3 primeras palabras: "Notebook … 512GB SSD, teclado retroiluminado" NO es accesorio."""
-    head = " ".join((name or "").split()[:3])
-    if category == "audifonos":                          # en esa categoría "audífonos" es el producto
-        head = re.sub(r"aud[ií]fonos?", " ", head, flags=re.I)
-    return bool(ACCESSORY.search(head))
-
-
-def too_cheap(name: str, category: str, price: int) -> str | None:
+def too_cheap(name: str, category: str, price: int, list_price: int | None = None,
+              store_category: str | None = None) -> str | None:
     """💥 Precio absurdo para lo que es (ej. PS5 a $49.990), aunque el producto acabe de aparecer y no tenga historial."""
     rule = TOO_CHEAP.get(category)
-    if not rule or is_accessory(name, category):
+    if not rule or not price or is_accessory(name, category, store_category):
         return None
     pattern, floor = rule
-    if not pattern.search(name or "") or price >= floor:
+    if not pattern.search(name or ""):
         return None
-    if category == "televisores":                       # solo TVs de 43" o más (las chicas sí son baratas)
-        size = re.search(r"(\d{2})\s*(\"|''|”|pulg|pulgadas|\bpul\b)", name or "", re.I)
-        if not size or int(size.group(1)) < 43:
+    floor = max([floor] + [f for rx, f in TIERS.get(category, []) if rx.search(name or "")])   # gama alta
+    if price >= floor:
+        return None
+    if list_price and list_price < floor:               # capa 5: la propia tienda dice que es un producto barato
+        return None
+    if REFURB.search(name or ""):                       # reacondicionado/seminuevo: más barato, pero no TANTO
+        floor *= 0.6
+        if price >= floor:
             return None
-    what = {"consolas": "una consola", "notebooks": "un notebook", "televisores": "un televisor", "celulares": "un celular",
-            "tablets": "una tablet", "audifonos": "unos audífonos", "smartwatches": "un smartwatch",
-            "electro": "un electrodoméstico"}.get(category, "este producto")
-    return f"{clp(price)} es demasiado barato para {what} así"
+    if category == "electro":                           # solo equipos de tamaño completo (no mini/portátil/semi)
+        if re.search(r"port[aá]til|mini\b|semi ?autom|viaje|insulina|plegable|camping|auto\b|12v|cooler", name, re.I):
+            return None
+        liters = [int(x) for x in re.findall(r"(\d{3})\s*(?:l|lts?|litros)\b", name, re.I)]
+        kg = [float(x.replace(",", ".")) for x in re.findall(r"(\d{1,2}(?:[.,]\d)?)\s*kg\b", name, re.I)]
+        big = (re.search(r"side by side|french door|no frost|bottom freezer|carga frontal|lavadora secadora|lavaseca",
+                         name, re.I) or any(l >= 250 for l in liters) or any(k >= 9 for k in kg))
+        if not big and price >= 50_000:                 # refrigerador/lavadora chico: error solo bajo $50k
+            return None
+    if category == "televisores":                       # TVs de 43"+ bajo $100k; de 32–42" bajo $50k
+        size = re.search(r"\b(\d{2})\s*(\"|''|”|pulg|pulgadas|\bpul\b)", name or "", re.I) or \
+            re.search(r"(?:tv|televisor)\D{0,15}\b(\d{2})\b", name or "", re.I)
+        inches = int(size.group(1)) if size else 0
+        if inches < 32 or (inches < 43 and price >= 50_000):
+            return None
+    return f"{clp(price)} es demasiado barato para {WHAT.get(category, 'este producto')} así"
+
+
+def family_key(gk: str | None, category: str) -> str | None:
+    """Familia de modelo: el mismo celular en cualquier capacidad ("apple iphone 18 pro max"), o el código exacto
+    en el resto de categorías. Reacondicionados y accesorios tienen su propio grupo y no entran."""
+    if not gk or ":" in gk:
+        return None
+    if category == "celulares":                          # reacondicionados: familia propia ("… reacond")
+        refurb = gk.endswith(" reacond")
+        fam = re.sub(r"\s\d+gb$", "", gk.removesuffix(" reacond"))
+        return (fam + (" reacond" if refurb else "")) if len(fam.split()) >= 3 else None
+    return gk if comparable(gk) else None
+
+
+def family_error(store: PriceStore, p, gk: str | None, category: str) -> tuple[str, int] | None:
+    """(motivo, precio de referencia) si p.price < 45 % de la mediana de su familia en todo el catálogo."""
+    fam = family_key(gk, category)
+    if not fam:
+        return None
+    base, suffix = (fam.removesuffix(" reacond"), " reacond") if fam.endswith(" reacond") else (fam, "")
+    rows = store.conn.execute(
+        "SELECT price, group_key FROM products WHERE key<>? AND missing_since IS NULL AND price>0 "
+        "AND (group_key=? OR group_key LIKE ?)", (p.key, fam, base + " %")).fetchall()
+    exact = re.compile(re.escape(base) + r"( \d+gb)?" + re.escape(suffix) + "$")
+    prices = [r[0] for r in rows if exact.match(r[1] or "")]
+    if not prices:
+        return None
+    ref = statistics.median(prices)
+    ratio = config.PRICE_ERROR_RATIO if len(prices) >= 2 else config.PRICE_ERROR_RATIO * 0.75   # 1 sola ref: más estricto
+    if p.price < ref * ratio:
+        return f"{(1 - p.price / ref) * 100:.0f}% bajo lo que cuesta este modelo en el catálogo ({clp(int(ref))})", int(ref)
+    return None
+
+
+def _marketplace(p) -> bool:
+    return any(b.startswith("Vendedor: ") for b in (p.badges or []))
+
+
+def price_error_reasons(p, category: str, check_card: bool = True, is_new: bool = True,
+                        drop_pct: float = 0.0) -> list[str]:
+    """Reglas de error que NO necesitan historial. Lista de motivos.
+
+    is_new=True (producto recién aparecido): solo "demasiado barato para lo que es". El "% de descuento sobre el
+    precio normal" NO basta, porque muchas tiendas inflan el "normal" (auditado con datos reales: Entel, Abc...).
+    is_new=False (un producto conocido que BAJÓ): también cuenta el descuento ≥70 % sobre el precio normal."""
+    sc = getattr(p, "store_category", None)
+    if is_accessory(p.name, category, sc):
+        return []
+    refurb = bool(REFURB.search(p.name or ""))          # su "precio normal" suele ser el de un equipo nuevo
+    out = []
+    cheap = too_cheap(p.name, category, p.price, p.list_price, sc)
+    discount_ok = (not is_new and not refurb and drop_pct >= 30 and p.list_price and p.list_price >= config.ERROR_MIN_LIST
+                   and p.discount_pct and p.discount_pct >= config.ERROR_DISCOUNT_PCT and not _marketplace(p))  # capa 6
+    # descuento EXTREMO en un producto caro: ni las tiendas que inflan el "normal" llegan a -80 % (máx. visto: -76 %)
+    discount_ok = discount_ok or bool(
+        is_new and not refurb and not _marketplace(p) and p.list_price and p.list_price >= config.ERROR_EXTREME_LIST
+        and p.discount_pct and p.discount_pct >= config.ERROR_EXTREME_PCT)
+    if discount_ok:
+        out.append(f"-{p.discount_pct:.0f}% sobre su precio normal ({clp(p.list_price)})")
+    elif cheap:
+        out.append(cheap)
+    if check_card and p.card_price and p.card_price < p.price and not out:
+        ref = p.list_price or p.price
+        disc = (1 - p.card_price / ref) * 100 if ref else 0
+        card_cheap = too_cheap(p.name, category, p.card_price, p.list_price, sc)
+        card_disc_ok = (not is_new and not refurb and drop_pct >= 30 and ref >= config.ERROR_MIN_LIST
+                        and disc >= config.ERROR_DISCOUNT_PCT and not _marketplace(p))
+        if card_disc_ok or card_cheap:
+            out.append(f"💳 {clp(p.card_price)} pagando con la tarjeta de la tienda (-{disc:.0f}% vs {clp(ref)})")
+    return out
 
 
 def evaluate(obs: Observation, store: PriceStore, watched: bool,
              targets: list | None = None, category: str = "celulares") -> list[Alert]:
     p = obs.product
     alerts: list[Alert] = []
+    accessory = is_accessory(p.name, category, getattr(p, "store_category", None))
 
-    # 💥 errores de precio que no necesitan historial (sirven para productos recién aparecidos)
-    if obs.is_new or obs.direction == "down":
-        if (p.list_price and p.list_price >= config.ERROR_MIN_LIST and p.discount_pct
-                and p.discount_pct >= config.ERROR_DISCOUNT_PCT and not is_accessory(p.name, category)):
-            alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?",
-                                [f"-{p.discount_pct:.0f}% sobre su precio normal ({clp(p.list_price)})"], 0, p.list_price))
-        else:
-            reason = too_cheap(p.name, category, p.price)
-            if reason:
-                alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?", [reason], 0, p.list_price or obs.previous))
-    # 💳 el error puede estar solo en el precio con tarjeta de la tienda (CMR, La Polar, Hites, Paris)
-    card_new = p.card_price and (obs.previous_card is None or p.card_price < obs.previous_card)
-    if card_new and not any(a.kind == "price_error" for a in alerts):
-        ref = p.list_price or p.price
-        disc = (1 - p.card_price / ref) * 100 if ref else 0
-        reason = too_cheap(p.name, category, p.card_price)
-        if (ref >= config.ERROR_MIN_LIST and disc >= config.ERROR_DISCOUNT_PCT and not is_accessory(p.name, category)) or reason:
-            alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO CON TARJETA?",
-                                [f"💳 {clp(p.card_price)} pagando con la tarjeta de la tienda (-{disc:.0f}% vs {clp(ref)})"],
-                                0, ref))
+    # 💥 errores de precio sin historial: precio público (si es nuevo o bajó) y con tarjeta (si es nuevo o bajó)
+    price_moved = obs.is_new or obs.direction == "down"
+    card_moved = bool(p.card_price) and (obs.previous_card is None or p.card_price < obs.previous_card)
+    if price_moved or card_moved:
+        drop = max(-obs.pct if obs.previous else 0,
+                   (1 - p.card_price / obs.previous_card) * 100 if p.card_price and obs.previous_card else 0)
+        for reason in price_error_reasons(p, category, check_card=card_moved, is_new=obs.is_new, drop_pct=drop):
+            card = reason.startswith("💳")
+            alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO CON TARJETA?" if card else "💥 ¿ERROR DE PRECIO?",
+                                [reason], 0, p.list_price or (p.price if card else obs.previous)))
 
     # 🦖 GODZILLA: caída brutal vs el máximo de las últimas 24 h
     if not obs.is_new:
         peak = store.max_price_since(p.key, ago(hours=24)) or obs.previous
-        if peak and p.price <= peak * (1 - config.GODZILLA_DROP_PCT / 100):
+        if (peak and peak >= config.GODZILLA_MIN_PEAK and not accessory
+                and p.price <= peak * (1 - config.GODZILLA_DROP_PCT / 100)):
             drop = (1 - p.price / peak) * 100
             alerts.append(Alert("godzilla", obs, "🦖🔥 ALERTA GODZILLA 🔥🦖",
                                 [f"Cayó <b>{drop:.0f}%</b> en 24 h (de {clp(peak)} a {clp(p.price)})"], 0, peak))
 
-    # 💥 posible error de precio: muy por debajo del mismo modelo en otras tiendas
-    gk = _group(store, p.key)
-    if (obs.is_new or obs.direction == "down") and comparable(gk):
-        others = store.group_prices(gk, p.key)
-        if len(others) >= 2:
-            med = statistics.median(others)
-            if p.price < med * config.PRICE_ERROR_RATIO:
-                alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?",
-                                    [f"{(1 - p.price / med) * 100:.0f}% bajo la mediana de otras tiendas ({clp(int(med))})"], 0,
-                                    int(med)))
+    # 💥 muy por debajo de lo que cuesta ESE modelo en el resto del catálogo (relativo: sirve para productos caros)
+    if (obs.is_new or obs.direction == "down") and not accessory and not any(a.kind == "price_error" for a in alerts):
+        hit = family_error(store, p, _group(store, p.key), category)
+        if hit:
+            alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?", [hit[0]], 0, hit[1]))
 
     if obs.is_new:
         return alerts

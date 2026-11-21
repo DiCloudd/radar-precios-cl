@@ -43,8 +43,11 @@ TIMEZONE = os.getenv("TZ_NAME", "America/Santiago")
 # ---------------------------------------------------------------- análisis
 MIN_HISTORY_HOURS = _float("MIN_HISTORY_HOURS", 72)   # antes de esto no hay "mínimo histórico"
 GODZILLA_DROP_PCT = _float("GODZILLA_DROP_PCT", 40)   # caída vs máximo 24 h
+GODZILLA_MIN_PEAK = _float("GODZILLA_MIN_PEAK", 50000) # 🦖 solo productos que valían ≥ $50.000 (no accesorios)
 ERROR_DISCOUNT_PCT = _float("ERROR_DISCOUNT_PCT", 70)  # 💥 descuento sobre el precio normal que huele a error
 ERROR_MIN_LIST = _float("ERROR_MIN_LIST", 150000)      # ...solo si el precio normal era alto (evita accesorios)
+ERROR_EXTREME_PCT = _float("ERROR_EXTREME_PCT", 80)     # 💥 producto NUEVO con -80 % o más…
+ERROR_EXTREME_LIST = _float("ERROR_EXTREME_LIST", 400000)  # …sobre un precio normal ≥ $400.000
 PRICE_ERROR_RATIO = _float("PRICE_ERROR_RATIO", 0.45) # precio < 45% de la mediana entre tiendas
 FAKE_LIST_RAISE_PCT = _float("FAKE_LIST_RAISE_PCT", 10)
 MISSING_HOURS = _float("MISSING_HOURS", 6)
