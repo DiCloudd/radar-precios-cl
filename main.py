@@ -132,7 +132,6 @@ async def run_loop(args) -> None:
     import restock
     from storage import PriceStore, now_iso
     try:
-        from storage import PriceStore
         with PriceStore(config.DB_PATH) as store:
             if not store.get_meta(f"{restock.META}:seeded"):          # 1 sola vez: gangas que YA estaban agotadas
                 added = restock.seed(store)

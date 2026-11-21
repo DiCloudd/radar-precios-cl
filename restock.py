@@ -35,7 +35,8 @@ MAX_WATCH = 80                 # tope de la lista (se quedan las de mayor ahorro
 WATCH_DAYS = 30                # una ganga agotada por más de 30 días sale de la lista
 EVERY = config._float("RESTOCK_EVERY", 120)        # s entre rondas del vigilante
 MAX_URLS_PER_ROUND = 12
-FAST_SWEEP_MIN = 5             # tiendas cuyo barrido completo dura menos que esto ya se releen solas
+SKIP_SITES = {"maconline"}     # su "listado" son ~15 fichas: releerlo cada 2 min sería abusivo (lo cubre el ciclo profundo)
+FAST_SWEEP_MIN = 5            # tiendas cuyo barrido completo dura menos que esto ya se releen solas
 
 
 def load(store: PriceStore) -> dict:
@@ -65,7 +66,8 @@ def check(store: PriceStore, obs: Observation, gk: str, category: str, src: conf
                 out.append(Alert("restock_watch", obs, "👀 GANGA AGOTADA: la vigilo",
                                  [hit[0], "Te aviso apenas vuelva el stock 🚨"], 2, hit[1]))
         else:
-            entry.update(price=p.price, found_at=p.found_at or entry.get("found_at"))
+            entry.update(price=p.price, name=p.name[:90], image=p.image or entry.get("image"),
+                         found_at=p.found_at or entry.get("found_at"))
         return out
     if entry and _available(p):                      # 🚨 volvió el stock
         watch.pop(p.key, None)
@@ -201,7 +203,8 @@ class RestockWatcher:
             urls: dict[str, config.Source] = {}
             for e in watch.values():
                 src = sources.get(e.get("source") or "")
-                if not e.get("found_at") or not src or src.name in fast or self.mon._paused(store, src):
+                if (not e.get("found_at") or not src or src.name in fast or src.site in SKIP_SITES
+                        or self.mon._paused(store, src)):
                     continue
                 urls.setdefault(e["found_at"], src)
         for url, src in list(urls.items())[:MAX_URLS_PER_ROUND]:

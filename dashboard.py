@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import csv
-import gzip
 import json
 import shutil
 import sqlite3

@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from analysis import TOO_CHEAP, family_error, is_accessory, price_error_reasons  # noqa: E402
+from analysis import TOO_CHEAP, bargain, family_error, is_accessory, price_error_reasons  # noqa: E402
 from matcher import group_key  # noqa: E402
 from models import Product  # noqa: E402
 from scrapers import SITE_LABELS  # noqa: E402
@@ -25,7 +25,7 @@ from storage import PriceStore  # noqa: E402
 
 def product(r, price=None, list_price=None) -> Product:
     return Product(r["key"], r["site"], r["name"], r["url"], price or r["price"],
-                   r["list_price"] if list_price is None else list_price, r["card_price"],
+                   r["list_price"] if list_price is None else list_price, r["card_price"], r["brand"],
                    badges=json.loads(r["badges"]) if r["badges"] else [])
 
 
@@ -62,6 +62,16 @@ def main() -> None:
         print(f"\n{title}  (de {len(rows)} productos)")
         for h in sorted(data)[:30]:
             print(f"[{h[0]}] {h[1]:<16} ${h[2]:>9,} normal {h[3] or '-':>9} 💳 {h[4] or '-':>8} | {h[5][:64]}\n        -> {h[6]}")
+    gangas = []
+    for r in rows:                                    # 🔥 gangas con la regla actual (informativo, para revisarlas a mano)
+        cat = r["category"] or "celulares"
+        hit = bargain(store, product(r), r["group_key"], cat)
+        if hit:
+            gangas.append((cat, SITE_LABELS.get(r["site"], r["site"]), r["price"], r["list_price"], r["card_price"],
+                           r["name"] + ("" if r["in_stock"] != 0 else "  [AGOTADO]"), hit[0]))
+    print(f"\n🔥 GANGAS (revisar a mano que sean reales): {len(gangas)}")
+    for h in sorted(gangas)[:30]:
+        print(f"[{h[0]}] {h[1]:<16} ${h[2]:>9,} normal {h[3] or '-':>9} 💳 {h[4] or '-':>8} | {h[5][:70]}\n        -> {h[6]}")
     print(f"\naccesorios detectados: {sum(1 for r in rows if is_accessory(r['name'], r['category'] or ''))} de {len(rows)}")
 
     tested, caught, missed = 0, 0, []

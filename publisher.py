@@ -4,7 +4,6 @@ Cada publicación es un único commit huérfano forzado: la rama nunca crece (el
 """
 from __future__ import annotations
 
-import gzip
 import logging
 import shutil
 import subprocess

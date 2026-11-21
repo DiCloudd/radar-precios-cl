@@ -15,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import config  # noqa: E402
 from fetchers import BrowserPool, HttpFetcher  # noqa: E402
 from scrapers import SCRAPERS, FetchContext  # noqa: E402
-from utils import with_query  # noqa: E402
 
 
 def sfcc_total(html: str) -> int | None:

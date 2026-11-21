@@ -11,7 +11,6 @@ from __future__ import annotations
 import gzip
 import io
 import os
-import shutil
 import sqlite3
 import subprocess
 import sys
