@@ -69,7 +69,12 @@ def main() -> None:
         i = args.index("--dump")
         dump = Path(args[i + 1])
         del args[i:i + 2]
-    with httpx.Client(headers=H, follow_redirects=True, timeout=30) as client:
+    headers = dict(H)
+    if "--referer" in args:                     # algunas APIs exigen el Referer de su propia página (como un navegador)
+        i = args.index("--referer")
+        headers["Referer"] = args[i + 1]
+        del args[i:i + 2]
+    with httpx.Client(headers=headers, follow_redirects=True, timeout=30) as client:
         for url in args:
             print(json.dumps(probe(client, url, dump), ensure_ascii=False), flush=True)
             time.sleep(2)
