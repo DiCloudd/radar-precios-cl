@@ -198,10 +198,28 @@ def main() -> int:
             return 1
         return 0 if n.send("✅ <b>Monitor de precios</b>: conexión con Telegram OK.") else 1
     if args.godzilla_test:
+        import html as _html
+
         import godzilla
-        TelegramNotifier(dry_run=args.dry_run).send_animation(
-            godzilla.asset(), "<b>🦖🔥 ALERTA GODZILLA (prueba) 🔥🦖</b>\nAsí se verá cuando un precio se desplome.")
-        return 0
+        from analysis import clp as _clp
+        from scrapers import SITE_LABELS
+        from storage import PriceStore
+        from telegram_bot import alert_buttons
+        caption, buttons = "<b>🦖🔥 ALERTA GODZILLA (prueba) 🔥🦖</b>\nAsí se verá cuando un precio se desplome.", None
+        if config.DB_PATH.exists():          # simula el error sobre un producto real (los botones funcionan)
+            with PriceStore(config.DB_PATH) as store:
+                r = store.conn.execute("""SELECT rowid AS rid, * FROM products WHERE missing_since IS NULL
+                    AND (name LIKE '%PlayStation 5%' OR name LIKE '%iPhone 17 Pro%') ORDER BY price DESC LIMIT 1""").fetchone()
+            if r:
+                fake = int(r["price"] * 0.12 // 1000 * 1000 + 990)
+                caption = (f"<b>🦖🔥 ALERTA GODZILLA 🔥🦖</b>  <i>(PRUEBA: precio simulado)</i>\n"
+                           f"<b>{_html.escape(r['name'])}</b>\n🏬 {SITE_LABELS.get(r['site'], r['site'])}\n"
+                           f"💰 <b>{_clp(fake)}</b>  (antes {_clp(r['price'])}, -{(1 - fake / r['price']) * 100:.0f}%)\n"
+                           f"   Cayó <b>{(1 - fake / r['price']) * 100:.0f}%</b> en 24 h\n"
+                           f"🔗 <a href=\"{_html.escape(r['url'], quote=True)}\">Ver producto</a>")
+                buttons = alert_buttons(r["rid"])
+        ok = TelegramNotifier(dry_run=args.dry_run).send_animation(godzilla.asset(), caption, buttons)
+        return 0 if ok else 1
     if args.summary:
         from monitor import Monitor
         Monitor(dry_run=args.dry_run).daily_summary(force=True)
