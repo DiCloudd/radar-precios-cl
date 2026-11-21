@@ -137,7 +137,8 @@ footer{margin-top:30px;color:var(--muted);font-size:12.5px;text-align:center}
     <button data-t="deals" class="on">🔥 Ofertas</button>
     <button data-t="compare">🔀 Comparador</button>
     <button data-t="all">📋 Todos</button>
-    <button data-t="fake">🤡 Sospechosas</button>
+    <button data-t="hall">🏆 Errores</button>
+    <button data-t="fake">🤡 Chantas</button>
     <button data-t="alerts">🔔 Alertas</button>
     <button data-t="stores">🩺 Tiendas</button>
     <button data-t="events">📅 Eventos</button>
@@ -298,9 +299,37 @@ const views = {
     }).join("");
   },
   fake() {
+    const rk = D.ranking || [], days = D.historyDays || 0;
+    const rows = rk.map((r, i) => `<tr><td>${i === 0 && r.index > 0 ? "🤡 " : ""}<b>${esc(r.store)}</b></td>
+      <td class="num"><b>${r.index}</b>/100</td><td class="num">${r.tachado_pct}%</td><td class="num">${r.avg_disc}%</td>
+      <td class="num">${r.fakes}</td><td class="num">${r.products}</td></tr>`).join("");
     const list = filtered().filter(p => p.fake);
-    return list.length ? `<p class="sub">El descuento anunciado no calza con el historial: el precio "normal" se infló o el "descuento" es permanente.</p><div class="grid">${list.map(cardHTML).join("")}</div>`
-      : `<div class="empty">🤡 Ninguna oferta sospechosa detectada (necesita historial de varios días).</div>`;
+    return `<h3 style="margin:4px 0 6px">🤡 Ranking de tiendas chantas</h3>
+      <p class="sub">Índice = 60% ofertas con descuento inflado (detectadas con historial) + 40% descuento "tachado" promedio que anuncian.
+      ${days < 7 ? `⏳ Llevamos ${days} día(s) de historial: el detector de descuentos inflados necesita ~7 días; por ahora pesa sobre todo el tachado.` : ""}</p>
+      <div class="tablewrap"><table><thead><tr><th>Tienda</th><th>Índice</th><th>Con tachado</th><th>Desc. anunciado</th><th>🤡 Inflados</th><th>Productos</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <h3 style="margin:20px 0 6px">Ofertas sospechosas</h3>
+      ${list.length ? `<div class="grid">${list.map(cardHTML).join("")}</div>`
+        : `<div class="empty">Ninguna oferta sospechosa todavía (necesita historial de varios días).</div>`}`;
+  },
+  hall() {
+    const h = D.hall || {}, list = (D.errors || []).filter(e => state.cat === "all" || e.category === state.cat);
+    const outcome = {"corregido": "🛑 corregido", "agotado": "⛔ agotado", "retirado": "👻 retirado", "en curso": "🎯 en curso",
+      "seguía activo": "⏰ seguía activo", "seguía activo (fin de ventana)": "⏰ seguía activo", "corregido antes del aviso": "⚡ corregido en segundos",
+      "sin seguimiento": "—"};
+    const verdict = {"confirmed": "✅ confirmado", "unconfirmed": "⚠️ sin confirmar", "corrected": "🛑 descartado"};
+    const kpi = [[h.count || 0, "errores detectados"], [h.confirmed || 0, "✅ confirmados"],
+      [h.median_minutes != null ? h.median_minutes + " min" : "–", "duración mediana"],
+      [h.max_disc != null ? "-" + h.max_disc + "%" : "–", "mayor descuento"], [clp(h.total_saving || 0), "ahorro potencial total"]]
+      .map(([v, l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+    const rows = list.map(e => `<tr data-k="${esc(e.key)}"><td><div class="store">${esc(e.store)} · ${new Date(e.detected_ts).toLocaleString("es-CL")}</div>${esc(e.name)}</td>
+      <td class="num"><b>${clp(e.error_price)}</b><br><span class="old">${e.ref_price ? clp(e.ref_price) : ""}</span></td>
+      <td class="num">${e.disc != null ? "-" + e.disc + "%" : "–"}</td><td>${verdict[e.verdict] || "—"}</td>
+      <td>${outcome[e.outcome] || esc(e.outcome || "")}${e.minutes ? ` · ${e.minutes} min` : ""}</td></tr>`).join("");
+    return `<h3 style="margin:4px 0 10px">🏆 Salón de la fama de errores de precio</h3><section class="kpis">${kpi}</section>
+      ${list.length ? `<div class="tablewrap"><table><thead><tr><th>Producto</th><th>Error / normal</th><th>Desc.</th><th>Verificación</th><th>Qué pasó</th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : `<div class="empty">🦖 Aún no hay errores de precio registrados. Cuando una tienda se equivoque, aparecerá aquí: cuánto duró y cuánto ahorrabas.</div>`}`;
   },
   alerts() {
     return D.alerts.length ? `<div class="feed">${D.alerts.map(a => `<div class="it ${a.kind}"><div class="ts">${new Date(a.ts).toLocaleString("es-CL")} · ${a.kind}</div>${safeHTML(a.message)}</div>`).join("")}</div>`
@@ -328,7 +357,7 @@ const views = {
 };
 
 function render() {
-  const showTools = ["deals", "all", "compare", "fake"].includes(state.tab);
+  const showTools = ["deals", "all", "compare", "fake", "hall"].includes(state.tab);
   $("#toolbar").style.display = showTools ? "flex" : "none";
   $("#sort").style.display = ["deals", "all"].includes(state.tab) ? "" : "none";
   $("#view").innerHTML = views[state.tab]();

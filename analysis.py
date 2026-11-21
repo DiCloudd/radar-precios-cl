@@ -18,6 +18,7 @@ class Alert:
     title: str
     lines: list[str] = field(default_factory=list)
     priority: int = 5              # menor = más importante
+    ref: int | None = None         # precio de referencia (para saber cuándo corrigieron un error)
 
     @property
     def key(self) -> str | None:
@@ -53,10 +54,11 @@ def is_real_historic_low(obs: Observation) -> bool:
 
 
 ACCESSORY = re.compile(
-    r"l[aá]mina|funda|carcasa|\bcase\b|protector|cargador|cable|adaptador|soporte|\bbase\b|mochila|bolso|malet[ií]n|"
-    r"mouse|teclado|skin|film|vidrio|templad|control|joystick|\bjuego|repuesto|bater[ií]a|aud[ií]fono|parlante|\bkit\b|"
-    r"accesorio|correa|stand|\bhub\b|docking|memoria|disco|\bssd\b|antena|\brack\b|limpia|l[aá]piz|stylus|tarjeta|gift|"
-    r"retro|\d+\s*en\s*1|tetris|pel[ií]cula|repisa|mueble|lente|cooler|ventilador|sticker|cubre", re.I)
+    r"l[aá]mina|funda|carcasa|\bcase\b|estuche|protector|cargador|cable|adaptador|soporte|\bbase\b|mochila|bolso|"
+    r"malet[ií]n|mouse|teclado|skin|film|vidrio|templad|control|joystick|\bjuegos?\b|repuesto|bater[ií]a|aud[ií]fonos?|"
+    r"parlante|\bkit\b|accesorio|correa|malla|stand|\bhub\b|docking|memoria|disco|pendrive|antena|\brack\b|limpia|"
+    r"l[aá]piz|stylus|tarjeta|gift|retro|tetris|pel[ií]cula|repisa|mueble|lente|cooler|ventilador|sticker|cubre|"
+    r"organizador|filtro|manguera|bandeja|frigobar|minibar|repelente", re.I)
 # (patrón que confirma que ES el producto, precio por debajo del cual huele a error)
 TOO_CHEAP = {
     "consolas": (re.compile(r"playstation|\bps[45]\b|xbox|nintendo|switch|steam deck|rog ally|legion go", re.I), 150_000),
@@ -64,13 +66,28 @@ TOO_CHEAP = {
                              r"ideapad|vivobook|zenbook|aspire|inspiron|pavilion|victus|omen|legion|\btuf\b|\brog\b", re.I), 150_000),
     "televisores": (re.compile(r"\b(tv|televisor|smart ?tv)\b", re.I), 100_000),
     "celulares": (re.compile(r"iphone 1[5-9]|iphone air|galaxy s2\d|galaxy z|pixel \d|pro max|xiaomi 1[5-9]", re.I), 150_000),
+    "tablets": (re.compile(r"ipad|galaxy tab s\d|\btab s\d|xiaomi pad|redmi pad pro|lenovo tab p\d|matepad", re.I), 100_000),
+    "audifonos": (re.compile(r"airpods (pro|max)|wh-?1000|wf-?1000|galaxy buds\s?\d? ?pro|buds\d? pro|"
+                             r"bose (qc|quietcomfort)|beats (studio|fit|solo)", re.I), 40_000),
+    "smartwatches": (re.compile(r"apple watch|galaxy watch|pixel watch|garmin (fenix|forerunner|epix|venu)|"
+                                r"huawei watch (gt|\d)|amazfit (gtr|balance|t-rex)", re.I), 50_000),
+    "electro": (re.compile(r"refrigerador|lavadora|secadora|side by side|french door|no frost", re.I), 100_000),
 }
+
+
+def is_accessory(name: str, category: str = "") -> bool:
+    """Las tiendas titulan los accesorios empezando por su tipo ("Funda…", "Lámina…", "Control…").
+    Solo se miran las 3 primeras palabras: "Notebook … 512GB SSD, teclado retroiluminado" NO es accesorio."""
+    head = " ".join((name or "").split()[:3])
+    if category == "audifonos":                          # en esa categoría "audífonos" es el producto
+        head = re.sub(r"aud[ií]fonos?", " ", head, flags=re.I)
+    return bool(ACCESSORY.search(head))
 
 
 def too_cheap(name: str, category: str, price: int) -> str | None:
     """💥 Precio absurdo para lo que es (ej. PS5 a $49.990), aunque el producto acabe de aparecer y no tenga historial."""
     rule = TOO_CHEAP.get(category)
-    if not rule or ACCESSORY.search(name or ""):
+    if not rule or is_accessory(name, category):
         return None
     pattern, floor = rule
     if not pattern.search(name or "") or price >= floor:
@@ -79,7 +96,10 @@ def too_cheap(name: str, category: str, price: int) -> str | None:
         size = re.search(r"(\d{2})\s*(\"|''|”|pulg|pulgadas|\bpul\b)", name or "", re.I)
         if not size or int(size.group(1)) < 43:
             return None
-    return f"{clp(price)} es demasiado barato para {category[:-1] if category != 'televisores' else 'un televisor'} así"
+    what = {"consolas": "una consola", "notebooks": "un notebook", "televisores": "un televisor", "celulares": "un celular",
+            "tablets": "una tablet", "audifonos": "unos audífonos", "smartwatches": "un smartwatch",
+            "electro": "un electrodoméstico"}.get(category, "este producto")
+    return f"{clp(price)} es demasiado barato para {what} así"
 
 
 def evaluate(obs: Observation, store: PriceStore, watched: bool,
@@ -90,13 +110,13 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
     # 💥 errores de precio que no necesitan historial (sirven para productos recién aparecidos)
     if obs.is_new or obs.direction == "down":
         if (p.list_price and p.list_price >= config.ERROR_MIN_LIST and p.discount_pct
-                and p.discount_pct >= config.ERROR_DISCOUNT_PCT and not ACCESSORY.search(p.name)):
+                and p.discount_pct >= config.ERROR_DISCOUNT_PCT and not is_accessory(p.name, category)):
             alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?",
-                                [f"-{p.discount_pct:.0f}% sobre su precio normal ({clp(p.list_price)})"], 0))
+                                [f"-{p.discount_pct:.0f}% sobre su precio normal ({clp(p.list_price)})"], 0, p.list_price))
         else:
             reason = too_cheap(p.name, category, p.price)
             if reason:
-                alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?", [reason], 0))
+                alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?", [reason], 0, p.list_price or obs.previous))
 
     # 🦖 GODZILLA: caída brutal vs el máximo de las últimas 24 h
     if not obs.is_new:
@@ -104,7 +124,7 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
         if peak and p.price <= peak * (1 - config.GODZILLA_DROP_PCT / 100):
             drop = (1 - p.price / peak) * 100
             alerts.append(Alert("godzilla", obs, "🦖🔥 ALERTA GODZILLA 🔥🦖",
-                                [f"Cayó <b>{drop:.0f}%</b> en 24 h (de {clp(peak)} a {clp(p.price)})"], 0))
+                                [f"Cayó <b>{drop:.0f}%</b> en 24 h (de {clp(peak)} a {clp(p.price)})"], 0, peak))
 
     # 💥 posible error de precio: muy por debajo del mismo modelo en otras tiendas
     gk = _group(store, p.key)
@@ -114,7 +134,8 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
             med = statistics.median(others)
             if p.price < med * config.PRICE_ERROR_RATIO:
                 alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?",
-                                    [f"{(1 - p.price / med) * 100:.0f}% bajo la mediana de otras tiendas ({clp(int(med))})"], 0))
+                                    [f"{(1 - p.price / med) * 100:.0f}% bajo la mediana de otras tiendas ({clp(int(med))})"], 0,
+                                    int(med)))
 
     if obs.is_new:
         return alerts

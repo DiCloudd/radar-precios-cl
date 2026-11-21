@@ -20,6 +20,7 @@ class Product:
     stock_text: str | None = None     # p.ej. "+100 unid."
     installments: int | None = None   # cuotas sin interés si la tienda lo informa
     badges: list[str] = field(default_factory=list)  # etiquetas de promo ("Cyber", "Envío gratis"...)
+    found_at: str | None = None       # URL de la página donde apareció (para re-verificar errores)
 
     @property
     def discount_pct(self) -> float | None:

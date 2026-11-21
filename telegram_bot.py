@@ -31,6 +31,7 @@ log = logging.getLogger("telegram")
 COMMANDS = [
     ("precio", "Buscar: /precio galaxy a57 · /precio notebook lenovo · /precio ps5"),
     ("top", "Mayores bajadas de las últimas 24 h"),
+    ("errores", "🏆 Últimos errores de precio: cuánto duraron y cuánto ahorrabas"),
     ("comparar", "Mismo modelo en todas las tiendas: /comparar iphone 17"),
     ("grafico", "Gráfico del historial: /grafico iphone 17 256"),
     ("objetivo", "Avisar bajo un precio: /objetivo 350000 galaxy a57"),
@@ -199,6 +200,20 @@ class TelegramBot:
         for i, (r, pct) in enumerate(drops, 1):
             lines.append(f"{i}. <b>{clp(r['price'])}</b> ({pct:+.0f}%) {SITE_LABELS.get(r['site'])} — "
                          f"<a href=\"{html.escape(r['url'], quote=True)}\">{html.escape(r['name'][:55])}</a>")
+        await self.reply(chat, "\n".join(lines))
+
+    async def cmd_errores(self, store, chat, arg):
+        rows = store.errors(10)
+        if not rows:
+            return await self.reply(chat, "🦖 Aún no hay errores de precio registrados. ¡Te aviso apenas una tienda se equivoque!")
+        icons = {"corregido": "🛑", "agotado": "⛔", "retirado": "👻", "en curso": "🎯", "corregido antes del aviso": "⚡"}
+        lines = ["🏆 <b>Últimos errores de precio</b>"]
+        for e in rows:
+            ref = e["ref_price"] or 0
+            disc = f" (-{(1 - e['error_price'] / ref) * 100:.0f}%)" if ref > e["error_price"] else ""
+            dur = f" · {e['minutes']:.0f} min" if e["minutes"] else ""
+            lines.append(f"{icons.get(e['outcome'], '⏰')} <b>{clp(e['error_price'])}</b>{disc} {SITE_LABELS.get(e['site'], e['site'])}{dur}\n"
+                         f"    <a href=\"{html.escape(e['url'] or '', quote=True)}\">{html.escape((e['name'] or '')[:60])}</a> · {e['outcome']}")
         await self.reply(chat, "\n".join(lines))
 
     async def cmd_comparar(self, store, chat, arg):

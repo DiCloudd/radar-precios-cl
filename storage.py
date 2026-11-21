@@ -37,6 +37,12 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_key_kind ON alerts(key, kind, ts);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS errors (                      -- 🏆 salón de la fama de errores de precio
+    id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT NOT NULL, site TEXT, name TEXT, url TEXT, image TEXT,
+    category TEXT, kind TEXT, ref_price INTEGER, error_price INTEGER, detected_ts TEXT NOT NULL,
+    verdict TEXT, verify_note TEXT, outcome TEXT, ended_ts TEXT, last_price INTEGER, minutes REAL
+);
+CREATE INDEX IF NOT EXISTS idx_errors_key ON errors(key, detected_ts);
 """
 
 
@@ -194,6 +200,24 @@ class PriceStore:
         self.conn.execute("INSERT INTO meta(k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v",
                           (k, json.dumps(v)))
         self.conn.commit()
+
+    # ---------------------------------------------------------------- 🏆 errores de precio
+    def add_error(self, p, kind: str, ref_price: int | None, ts: str, verdict: str, note: str, category: str) -> int:
+        cur = self.conn.execute(
+            """INSERT INTO errors(key, site, name, url, image, category, kind, ref_price, error_price, detected_ts,
+                                  verdict, verify_note, outcome, last_price)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'en curso',?)""",
+            (p.key, p.site, p.name, p.url, p.image, category, kind, ref_price, p.price, ts, verdict, note, p.price))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def close_error(self, error_id: int, outcome: str, last_price: int | None, ts: str, minutes: float) -> None:
+        self.conn.execute("UPDATE errors SET outcome=?, last_price=?, ended_ts=?, minutes=? WHERE id=?",
+                          (outcome, last_price, ts, round(minutes, 1), error_id))
+        self.conn.commit()
+
+    def errors(self, limit: int = 200) -> list[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM errors ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
 
     def prune(self, days: int = 400) -> None:
         self.conn.execute("DELETE FROM runs WHERE ts<?", (ago(days=30),))

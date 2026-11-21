@@ -370,6 +370,307 @@ url = "https://www.hites.com/tecnologia/videojuegos/consolas/?srule=price-low-to
 max_pages = 1
 
 
+
+# ============================== 📲 TABLETS ===================================================
+
+[[source]]
+name = "Falabella · Tablets ⚡"
+site = "falabella"
+category = "tablets"
+url = "https://www.falabella.com/falabella-cl/category/cat7230007/Tablets?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Falabella · Tablets"
+site = "falabella"
+category = "tablets"
+url = "https://www.falabella.com/falabella-cl/category/cat7230007/Tablets"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "PCFactory · Tablets ⚡"
+site = "pcfactory"
+category = "tablets"
+url = "https://www.pcfactory.cl/categoria/computadores-y-tablets/tablets-y-ereaders/tablets?categorias=488&sort=precio,asc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "PCFactory · Tablets"
+site = "pcfactory"
+category = "tablets"
+url = "https://www.pcfactory.cl/categoria/computadores-y-tablets/tablets-y-ereaders/tablets?categorias=488"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Tablets ⚡"
+site = "abc"
+category = "tablets"
+url = "https://www.abc.cl/tecnologia/computadores/tablet/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Abc (La Polar) · Tablets"
+site = "abc"
+category = "tablets"
+url = "https://www.abc.cl/tecnologia/computadores/tablet/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Hites · Tablets ⚡"
+site = "hites"
+category = "tablets"
+url = "https://www.hites.com/tecnologia/computacion/tablets/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Hites · Tablets"
+site = "hites"
+category = "tablets"
+url = "https://www.hites.com/tecnologia/computacion/tablets/"
+max_pages = 2
+fast = false
+
+
+# ============================== 🎧 AUDÍFONOS =================================================
+
+[[source]]
+name = "Falabella · Audífonos ⚡"
+site = "falabella"
+category = "audifonos"
+url = "https://www.falabella.com/falabella-cl/category/cat1640002/Audifonos?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Falabella · Audífonos"
+site = "falabella"
+category = "audifonos"
+url = "https://www.falabella.com/falabella-cl/category/cat1640002/Audifonos"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "PCFactory · Audífonos ⚡"
+site = "pcfactory"
+category = "audifonos"
+url = "https://www.pcfactory.cl/categoria/smartphones-y-wearables/audifonos?categorias=850&sort=precio,asc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "PCFactory · Audífonos"
+site = "pcfactory"
+category = "audifonos"
+url = "https://www.pcfactory.cl/categoria/smartphones-y-wearables/audifonos?categorias=850"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Audífonos ⚡"
+site = "abc"
+category = "audifonos"
+url = "https://www.abc.cl/tecnologia/audio/audifonos/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Abc (La Polar) · Audífonos"
+site = "abc"
+category = "audifonos"
+url = "https://www.abc.cl/tecnologia/audio/audifonos/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Hites · Audífonos ⚡"
+site = "hites"
+category = "audifonos"
+url = "https://www.hites.com/celulares/accesorios-para-celulares/audifonos/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Hites · Audífonos"
+site = "hites"
+category = "audifonos"
+url = "https://www.hites.com/celulares/accesorios-para-celulares/audifonos/"
+max_pages = 2
+fast = false
+
+
+# ============================== ⌚ SMARTWATCHES ==============================================
+
+[[source]]
+name = "Falabella · Smartwatches ⚡"
+site = "falabella"
+category = "smartwatches"
+url = "https://www.falabella.com/falabella-cl/category/cat4290063/Smartwatch?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Falabella · Smartwatches"
+site = "falabella"
+category = "smartwatches"
+url = "https://www.falabella.com/falabella-cl/category/cat4290063/Smartwatch"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "PCFactory · Smartwatches ⚡"
+site = "pcfactory"
+category = "smartwatches"
+url = "https://www.pcfactory.cl/categoria/smartphones-y-wearables/wearables/smartwatches?categorias=685&sort=precio,asc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "PCFactory · Smartwatches"
+site = "pcfactory"
+category = "smartwatches"
+url = "https://www.pcfactory.cl/categoria/smartphones-y-wearables/wearables/smartwatches?categorias=685"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Smartwatches ⚡"
+site = "abc"
+category = "smartwatches"
+url = "https://www.abc.cl/tecnologia/celulares/smartwatch/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Abc (La Polar) · Smartwatches"
+site = "abc"
+category = "smartwatches"
+url = "https://www.abc.cl/tecnologia/celulares/smartwatch/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Hites · Smartwatches ⚡"
+site = "hites"
+category = "smartwatches"
+url = "https://www.hites.com/celulares/wearables/smartwatch/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Hites · Smartwatches"
+site = "hites"
+category = "smartwatches"
+url = "https://www.hites.com/celulares/wearables/smartwatch/"
+max_pages = 2
+fast = false
+
+
+# ============================== 🧊 ELECTRO (refrigeradores y lavadoras) ======================
+
+[[source]]
+name = "Falabella · Refrigeradores ⚡"
+site = "falabella"
+category = "electro"
+url = "https://www.falabella.com/falabella-cl/category/cat3205/Refrigeradores?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Falabella · Refrigeradores"
+site = "falabella"
+category = "electro"
+url = "https://www.falabella.com/falabella-cl/category/cat3205/Refrigeradores"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Falabella · Lavadoras ⚡"
+site = "falabella"
+category = "electro"
+url = "https://www.falabella.com/falabella-cl/category/cat4060/Lavadoras?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Falabella · Lavadoras"
+site = "falabella"
+category = "electro"
+url = "https://www.falabella.com/falabella-cl/category/cat4060/Lavadoras"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Refrigeradores ⚡"
+site = "abc"
+category = "electro"
+url = "https://www.abc.cl/linea-blanca/refrigeradores/ver-todo/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Abc (La Polar) · Refrigeradores"
+site = "abc"
+category = "electro"
+url = "https://www.abc.cl/linea-blanca/refrigeradores/ver-todo/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Lavadoras ⚡"
+site = "abc"
+category = "electro"
+url = "https://www.abc.cl/linea-blanca/lavado-y-secado/lavadoras/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Abc (La Polar) · Lavadoras"
+site = "abc"
+category = "electro"
+url = "https://www.abc.cl/linea-blanca/lavado-y-secado/lavadoras/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Hites · Refrigeradores ⚡"
+site = "hites"
+category = "electro"
+url = "https://www.hites.com/electro-hogar/refrigeracion/refrigeradores/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Hites · Refrigeradores"
+site = "hites"
+category = "electro"
+url = "https://www.hites.com/electro-hogar/refrigeracion/refrigeradores/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Hites · Lavadoras ⚡"
+site = "hites"
+category = "electro"
+url = "https://www.hites.com/electro-hogar/lavado-y-secado/lavadoras/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2       # trampa revisada cada 2 ciclos rápidos (~4 min)
+
+[[source]]
+name = "Hites · Lavadoras"
+site = "hites"
+category = "electro"
+url = "https://www.hites.com/electro-hogar/lavado-y-secado/lavadoras/"
+max_pages = 2
+fast = false
+
+
 # ============================================================================
 #  [[watch]]  productos individuales (página de producto). Se revisan en cada
 #  ciclo rápido y avisan si se agotan / desaparecen / vuelven.

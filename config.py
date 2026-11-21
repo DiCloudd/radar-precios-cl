@@ -90,7 +90,8 @@ class Source:
     max_pages: int = 1
     enabled: bool = True
     fast: bool = True        # False = solo en escaneos profundos (tiendas que piden varias peticiones)
-    category: str = "celulares"   # celulares | notebooks | televisores | consolas
+    category: str = "celulares"   # ver CATEGORY_LABELS
+    fast_every: int = 1      # en el ciclo rápido, revisar 1 de cada N ciclos (reparte la carga entre tiendas)
 
 
 @dataclass(frozen=True)
@@ -122,7 +123,7 @@ def _load() -> tuple[list[Source], list[Watch], list[Target]]:
     override = int(os.getenv("MAX_PAGES", "0") or 0)
     sources = [
         Source(s["name"], s["url"], s["site"], override or int(s.get("max_pages", 1)), bool(s.get("enabled", True)),
-               bool(s.get("fast", True)), s.get("category", "celulares"))
+               bool(s.get("fast", True)), s.get("category", "celulares"), max(1, int(s.get("fast_every", 1))))
         for s in data.get("source", [])
     ]
     watches = [Watch(w["name"], w["url"], w.get("target_price")) for w in data.get("watch", [])]
@@ -139,4 +140,5 @@ def _load() -> tuple[list[Source], list[Watch], list[Target]]:
 SOURCES, WATCHES, TARGETS = _load()
 
 CATEGORY_LABELS = {"celulares": "📱 Celulares", "notebooks": "💻 Notebooks", "televisores": "📺 Televisores",
-                   "consolas": "🎮 Consolas"}
+                   "consolas": "🎮 Consolas", "tablets": "📲 Tablets", "audifonos": "🎧 Audífonos",
+                   "smartwatches": "⌚ Smartwatches", "electro": "🧊 Electro"}

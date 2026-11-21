@@ -20,6 +20,7 @@ from scrapers import SCRAPERS, SITE_LABELS, FetchContext
 import userprefs
 from storage import PriceStore, ago, now_iso
 from telegram_bot import alert_buttons
+from verifier import MAX_HUNTS, Verifier
 
 log = logging.getLogger("monitor")
 
@@ -46,12 +47,20 @@ def _is_watched(key: str, name: str, site: str, targets: list) -> bool:
 
 
 class Monitor:
-    def __init__(self, dry_run: bool = False) -> None:
+    def __init__(self, dry_run: bool = False, hunting: bool = False) -> None:
         self.ctx = FetchContext(HttpFetcher(), BrowserPool())
         self.notifier = TelegramNotifier(dry_run=dry_run)
         self.sem = asyncio.Semaphore(config.CONCURRENCY)
+        self.verifier = Verifier(self.ctx)
+        self.hunting = hunting                  # modo caza solo en el modo 24/7 (necesita seguir vivo)
+        self.hunts: set[asyncio.Task] = set()
+        self.fast_count = 0                     # para rotar fuentes con fast_every > 1
 
     async def aclose(self) -> None:
+        for t in list(self.hunts):              # fin de ventana: cierra las cazas (quedan como "seguía activo")
+            t.cancel()
+        if self.hunts:
+            await asyncio.gather(*self.hunts, return_exceptions=True)
         await self.ctx.http.aclose()
         await self.ctx.browser.aclose()
 
@@ -110,6 +119,8 @@ class Monitor:
     async def cycle(self, mode: str = "fast") -> CycleReport:
         started = time.monotonic()
         report = CycleReport(mode)
+        if mode == "fast":
+            self.fast_count += 1
         ts = now_iso()
         with PriceStore(config.DB_PATH) as store:
             jobs, skipped = [], []
@@ -118,8 +129,8 @@ class Monitor:
                 if src.site not in SCRAPERS:
                     log.error("Extractor desconocido '%s' en %s", src.site, src.name)
                     continue
-                if mode == "fast" and not src.fast:
-                    continue                                  # tienda pesada: solo en el escaneo profundo
+                if mode == "fast" and (not src.fast or self.fast_count % src.fast_every):
+                    continue                                  # solo profundo, o le toca en otro ciclo rápido
                 pause = self._paused(store, src)
                 if pause:
                     skipped.append(ScrapeResult(src, skipped=pause))
@@ -172,26 +183,46 @@ class Monitor:
                 fresh.append((a, text))
             store.commit()
             report.alerts = [a for a, _ in fresh]
-            self._notify(fresh, report, store)
+            await self._notify(fresh, report, store)
         report.duration = time.monotonic() - started
         return report
 
-    def _notify(self, fresh: list[tuple[Alert, str]], report: CycleReport, store: PriceStore) -> None:
+    async def _notify(self, fresh: list[tuple[Alert, str]], report: CycleReport, store: PriceStore) -> None:
+        def row_of(a: Alert):
+            return store.conn.execute("SELECT rowid, category, image FROM products WHERE key=?", (a.key,)).fetchone() if a.obs else None
+
         def buttons(a: Alert) -> dict | None:
-            if not a.obs:
-                return None
-            row = store.conn.execute("SELECT rowid FROM products WHERE key=?", (a.key,)).fetchone()
+            row = row_of(a)
             return alert_buttons(row[0]) if row else None
 
-        big = [(a, t) for a, t in fresh if a.kind in ("godzilla", "price_error")]
-        normal = [(a, t) for a, t in fresh if a.kind not in ("godzilla", "price_error")]
-        for a, text in big:   # 🦖 cada Godzilla va solo, con GIF y botones
-            self.notifier.send_animation(godzilla.asset(), text, buttons(a))
-        # pocas alertas -> una por mensaje con botones 📊🎯🔕; muchas -> agrupadas (evita spam)
+        big = [(a, t) for a, t in fresh if a.kind in ("godzilla", "price_error") and a.obs]
+        normal = [(a, t) for a, t in fresh if (a, t) not in big]
+
+        # ✅ verificación instantánea de todos los errores en paralelo
+        verdicts = await asyncio.gather(*(self.verifier.verify(a.obs.product) for a, _ in big)) if big else []
+        for (a, text), v in zip(big, verdicts):
+            p, row, ts = a.obs.product, row_of(a), now_iso()
+            eid = store.add_error(p, a.kind, a.ref, ts, v.status, v.note, row[1] if row else "celulares")
+            if v.status == "corrected":
+                store.close_error(eid, "corregido antes del aviso", v.price, ts, 0.3)
+                log.info("Error de precio en %s corregido antes de avisar (%s)", p.key, v.note)
+                continue
+            title, _, rest = text.partition("\n")
+            self.notifier.send_animation(godzilla.asset(), f"{title}\n{v.line}\n{rest}", buttons(a))
+            if self.hunting and len(self.hunts) < MAX_HUNTS:      # 🎯 modo caza
+                task = asyncio.create_task(self.verifier.hunt(p, eid, a.ref, self.notifier.send))
+                self.hunts.add(task)
+                task.add_done_callback(self.hunts.discard)
+            else:
+                store.close_error(eid, "sin seguimiento", p.price, ts, 0)
+
+        # pocas alertas -> una por mensaje con foto y botones 📊🎯🔕; muchas -> agrupadas (evita spam)
         rest = []
         if len(normal) <= 8:
             for a, text in normal:
-                self.notifier.send(text, buttons(a))
+                row = row_of(a)
+                image = (a.obs.product.image if a.obs else None) or (row[2] if row else None)
+                self.notifier.send_photo(image, text, buttons(a)) if image else self.notifier.send(text, buttons(a))
         else:
             rest = [t for _, t in normal]
         header = f"🛒 <b>Monitor de precios</b> · {datetime.now():%d-%m %H:%M}"

@@ -108,6 +108,20 @@ class TelegramNotifier:
         time.sleep(1.1)  # ~1 msg/s por chat
         return ok
 
+    def send_photo(self, image_url: str, caption: str, buttons: dict | None = None) -> bool:
+        """🖼️ Alerta con la foto del producto. Si Telegram no puede bajar la imagen, cae a texto."""
+        if not self.live:
+            print(f"\n--- [consola] FOTO {image_url[:80]} + mensaje ---\n{caption}\n--- fin ---")
+            return True
+        if not image_url.startswith("http") or len(caption) > 1024:
+            return self.send(caption, buttons)
+        data = {"chat_id": self.chat_id, "photo": image_url, "caption": caption, "parse_mode": "HTML"}
+        if buttons:
+            data["reply_markup"] = json.dumps(buttons)
+        ok = self._post("sendPhoto", data)
+        time.sleep(1.1)
+        return ok or self.send(caption, buttons)
+
     def send_animation(self, gif: Path, caption: str, buttons: dict | None = None) -> bool:
         if not self.live:
             print(f"\n--- [consola] GIF {gif.name} + mensaje ---\n{caption}\n--- fin ---")

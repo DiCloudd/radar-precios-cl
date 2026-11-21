@@ -84,6 +84,37 @@ def build_data(store: PriceStore) -> dict:
             "avgSec": round(statistics.mean(r["duration"] for r in day), 1) if day else None,
             "products": sum(1 for p in products if p["site"] == src.site and not p["missing"]),
         })
+    # 🏆 salón de la fama: errores de precio detectados, cuánto duraron y cuánto ahorraban
+    errors = []
+    for e in store.errors(200):
+        ref = e["ref_price"] or 0
+        errors.append({**dict(e), "store": SITE_LABELS.get(e["site"], e["site"]),
+                       "disc": round((1 - e["error_price"] / ref) * 100) if ref > e["error_price"] else None,
+                       "saving": ref - e["error_price"] if ref > e["error_price"] else None})
+    durations = [e["minutes"] for e in errors if e["minutes"] and e["outcome"] in ("corregido", "agotado", "retirado")]
+    hall = {"count": len(errors), "confirmed": sum(1 for e in errors if e["verdict"] == "confirmed"),
+            "median_minutes": round(statistics.median(durations), 1) if durations else None,
+            "max_disc": max((e["disc"] for e in errors if e["disc"]), default=None),
+            "total_saving": sum(e["saving"] for e in errors if e["saving"] and e["verdict"] != "corrected")}
+
+    # 🤡 ranking de tiendas "chantas": descuentos inflados (necesita historial) + qué tanto abusan del precio tachado
+    ranking = []
+    for site in sorted({p["site"] for p in products if not p["missing"]}):
+        items = [p for p in products if p["site"] == site and not p["missing"]]
+        listed = [p for p in items if p["disc"]]
+        fakes = sum(1 for p in items if p["fake"])
+        fake_share = fakes / len(items) if items else 0
+        avg_disc = statistics.mean(p["disc"] for p in listed) if listed else 0
+        index = round(0.6 * min(100, fake_share * 400) + 0.4 * min(100, avg_disc * 2))
+        ranking.append({"site": site, "store": SITE_LABELS.get(site, site), "products": len(items),
+                        "tachado_pct": round(len(listed) / len(items) * 100) if items else 0,
+                        "avg_disc": round(avg_disc, 1), "fakes": fakes, "index": index})
+    ranking.sort(key=lambda r: -r["index"])
+    history_days = 0
+    first = store.conn.execute("SELECT MIN(ts) FROM prices").fetchone()[0]
+    if first:
+        history_days = (datetime.now() - datetime.fromisoformat(first)).days
+
     alerts = [dict(r) for r in store.conn.execute(
         "SELECT ts, key, kind, price, message FROM alerts ORDER BY id DESC LIMIT 150")]
     ev = active_event()
@@ -93,6 +124,7 @@ def build_data(store: PriceStore) -> dict:
         "upcoming": [{"name": e.name, "start": e.start.isoformat(), "end": e.end.isoformat(), "estimated": e.estimated}
                      for e in upcoming()],
         "categories": config.CATEGORY_LABELS,
+        "errors": errors, "hall": hall, "ranking": ranking, "historyDays": history_days,
         "stores": stores, "products": products, "comparisons": comparisons[:300], "alerts": alerts,
         "totals": {"products": len(products), "active": sum(1 for p in products if not p["missing"]),
                    "drops24": sum(1 for p in products if p["ch24"] and p["ch24"] < 0),

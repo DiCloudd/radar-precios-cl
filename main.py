@@ -12,6 +12,7 @@
     python main.py --test-telegram   # prueba la conexión con el bot
     python main.py --bot             # solo el bot de Telegram (comandos /precio, /top, /objetivo...)
     python main.py --godzilla-test   # 🦖 envía una alerta Godzilla de prueba
+    python main.py --selftest        # ✅ verifica un producto real por tienda (listado + ficha)
 
 Código de salida: 0 = todas las fuentes OK, 1 = alguna falló (útil para cron / Task Scheduler / CI).
 """
@@ -97,7 +98,7 @@ def _build_and_publish(publish: bool) -> None:
 async def run_loop(args) -> None:
     from monitor import Monitor
     log = logging.getLogger("loop")
-    mon = Monitor(dry_run=args.dry_run)
+    mon = Monitor(dry_run=args.dry_run, hunting=True)
     stop = asyncio.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
@@ -156,6 +157,36 @@ async def run_loop(args) -> None:
         log.info("Monitor detenido.")
 
 
+async def run_selftest() -> int:
+    """Autodiagnóstico contra tiendas reales: por cada tienda lee un producto y lo verifica (listado + ficha).
+    Como el precio no cambió, lo esperado es ✅ confirmado. Sirve para saber que la verificación funciona en la nube."""
+    from fetchers import BrowserPool, HttpFetcher
+    from scrapers import SCRAPERS, FetchContext
+    from verifier import PDP_SITES, Verifier
+    ctx = FetchContext(HttpFetcher(), BrowserPool())
+    ver, done, bad = Verifier(ctx), set(), 0
+    print(f"{'tienda':<12} {'lectura':<10} {'veredicto':<12} detalle")
+    try:
+        for src in config.SOURCES:
+            if src.site in done or src.site in ("paris", "lider"):        # bloquean la nube (ya conocido)
+                continue
+            done.add(src.site)
+            res = await SCRAPERS[src.site]().scrape(ctx, src, 1)
+            if not res.ok:
+                print(f"{src.site:<12} {'FALLA':<10} {'-':<12} {res.error or res.skipped}")
+                bad += 1
+                continue
+            p = res.products[0]
+            v = await ver.verify(p, delay=0)
+            how = "lis+ficha" if src.site in PDP_SITES and src.site != "maconline" else ("ficha" if src.site == "maconline" else "listado")
+            print(f"{src.site:<12} {how:<10} {v.status:<12} {v.note[:70]}  [{p.name[:30]} {p.price}]")
+            bad += v.status != "confirmed"
+    finally:
+        await ctx.http.aclose()
+    print(f"\n{len(done) - bad}/{len(done)} tiendas verificadas correctamente")
+    return 0 if bad == 0 else 1
+
+
 async def run_bot_only() -> None:
     """Solo el bot (sin scrapear): útil para probar comandos en local."""
     from telegram_bot import TelegramBot
@@ -182,6 +213,7 @@ def main() -> int:
     ap.add_argument("--publish", action="store_true", help="genera y publica el dashboard")
     ap.add_argument("--test-telegram", action="store_true")
     ap.add_argument("--bot", action="store_true", help="solo el bot de Telegram (responde comandos)")
+    ap.add_argument("--selftest", action="store_true", help="verifica un producto real por tienda (diagnóstico)")
     ap.add_argument("--godzilla-test", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
@@ -236,6 +268,8 @@ def main() -> int:
     if args.bot:
         asyncio.run(run_bot_only())
         return 0
+    if args.selftest:
+        return asyncio.run(run_selftest())
     return asyncio.run(run_once(args))
 
 

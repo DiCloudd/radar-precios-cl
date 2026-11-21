@@ -84,6 +84,8 @@ class Scraper:
                     result.warnings.append(f"página {n}: {msg}")
                 break
             fresh = [p for p in dedupe(page.products) if p.key not in seen]
+            for p in fresh:
+                p.found_at = url
             if page.total_pages:
                 result.total_pages = page.total_pages
             if not fresh:
