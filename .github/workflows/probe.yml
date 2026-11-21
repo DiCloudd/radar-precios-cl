@@ -1,0 +1,21 @@
+# Diagnóstico manual: prueba cómo responden tiendas a las IPs de GitHub y guarda el HTML como artefacto.
+name: probe
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "URLs separadas por espacio"
+        required: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install httpx==0.28.1
+      - run: python tools/probe.py ${{ inputs.urls }} --dump probe-out
+      - uses: actions/upload-artifact@v4
+        with: { name: probe-out, path: probe-out, retention-days: 3 }
