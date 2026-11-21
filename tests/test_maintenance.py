@@ -46,3 +46,41 @@ def test_size_and_budget_warnings():
     budget = M.request_budget()
     assert budget["www.falabella.com"] <= M.REQ_PER_MIN_WARN      # la configuración actual está dentro del límite
     assert M.budget_warnings({"x.cl": 30}) and not M.budget_warnings(budget)
+
+
+# ---------------------------------------------------------------- 🏆 salón de la fama honesto y sin avisos repetidos
+def _err_store(tmp_path):
+    from models import Product
+    from storage import PriceStore
+    s = PriceStore(tmp_path / "e.db")
+    band = Product("h:1", "hites", "Sport Band Para Galaxy Watch9 Watch8 Blue", "u", 34_990, list_price=49_990)
+    s.observe(band, "accesorio: band", "src", category="smartwatches")
+    s.add_error(band, "price_error", 49_990, "2026-11-21T01:59:09", "confirmed", "x", "smartwatches")
+    real = Product("f:1", "falabella", "Apple iPhone 17 Pro Max 256GB", "u", 199_990, list_price=1_599_990)
+    s.observe(real, "apple iphone 17 pro max 256gb", "src", category="celulares")
+    s.add_error(real, "price_error", 1_599_990, "2026-11-21T02:00:00", "confirmed", "x", "celulares")
+    return s
+
+
+def test_recheck_discards_old_false_positives(tmp_path, monkeypatch):
+    import maintenance as M
+    monkeypatch.setattr("storage.ago", lambda **kw: "2000-01-01T00:00:00")
+    s = _err_store(tmp_path)
+    assert M.recheck_errors(s, days=3650) == 1
+    assert [e["name"][:9] for e in s.errors()] == ["Apple iPh"]          # la Sport Band ya no aparece
+    s.close()
+
+
+def test_stale_hunts_are_closed(tmp_path):
+    s = _err_store(tmp_path)
+    assert s.close_stale_errors() == 2 and all(e["outcome"].startswith("seguía") for e in s.errors())
+    s.close()
+
+
+def test_same_godzilla_not_repeated_within_a_week(tmp_path):
+    from storage import PriceStore, now_iso
+    s = PriceStore(tmp_path / "g.db")
+    s.add_alert("h:9", "godzilla", 169_990, "x", now_iso())
+    assert s.alerted_at_or_below("h:9", "godzilla", 169_990, 7)          # mismo precio: no se repite
+    assert not s.alerted_at_or_below("h:9", "godzilla", 149_990, 7)      # bajó MÁS: sí se avisa
+    s.close()

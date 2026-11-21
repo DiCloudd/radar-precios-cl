@@ -211,6 +211,10 @@ class Monitor:
             dedupe_key = a.key or a.title
             if store.alerted_recently(dedupe_key, a.kind, a.price, config.ALERT_COOLDOWN_HOURS):
                 continue
+            # errores, Godzilla y gangas: 1 aviso por semana salvo que baje MÁS (anoche: el mismo Godzilla 2 veces)
+            if a.key and a.kind in ("godzilla", "price_error", "ganga", "restock_watch") and \
+                    store.alerted_at_or_below(a.key, a.kind, a.price, 7):
+                continue
             if a.kind not in ("godzilla", "price_error") and userprefs.is_muted(store, a.key):
                 continue                                   # 🔕 silenciado desde Telegram
             fake = fake_discount(a.obs, store) if a.obs else None

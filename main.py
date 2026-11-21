@@ -140,6 +140,13 @@ async def run_loop(args) -> None:
                     mon.notifier.send(restock.seed_message(added))
     except Exception:  # noqa: BLE001
         log.exception("No se pudo sembrar la vigilancia de stock")
+    try:                                                  # 🏆 salón de la fama al día y honesto
+        import maintenance as M
+        with PriceStore(config.DB_PATH) as store:
+            store.close_stale_errors()
+            M.recheck_errors(store)
+    except Exception:  # noqa: BLE001
+        log.exception("No se pudo revisar el salón de la fama")
     watcher = restock.RestockWatcher(mon)
     watch_task = asyncio.create_task(watcher.run(bot_stop))   # 🚨 relee las gangas agotadas cada ~2 min
     log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)

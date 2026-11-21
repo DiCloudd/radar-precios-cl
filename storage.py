@@ -218,7 +218,24 @@ class PriceStore:
         self.conn.commit()
 
     def errors(self, limit: int = 200) -> list[sqlite3.Row]:
-        return self.conn.execute("SELECT * FROM errors ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        """Salón de la fama (sin los descartados como falso positivo al corregir una regla)."""
+        return self.conn.execute("SELECT * FROM errors WHERE outcome NOT LIKE 'descartado%' OR outcome IS NULL "
+                                 "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+
+    def close_stale_errors(self, hours: float = 1) -> int:
+        """Cazas que quedaron "en curso" porque la ventana se cortó antes de cerrarlas."""
+        n = self.conn.execute("UPDATE errors SET outcome='seguía activo (fin de ventana)', ended_ts=COALESCE(ended_ts, ?) "
+                              "WHERE outcome='en curso' AND detected_ts<?", (now_iso(), ago(hours=hours))).rowcount
+        self.conn.commit()
+        return n
+
+    def alerted_at_or_below(self, key: str, kind: str, price: int | None, days: float) -> bool:
+        """¿Ya se avisó este producto (mismo tipo) a este precio o más barato en los últimos días?"""
+        if price is None:
+            return False
+        row = self.conn.execute("SELECT 1 FROM alerts WHERE key=? AND kind=? AND price<=? AND ts>=? LIMIT 1",
+                                (key, kind, int(price * 1.02), ago(days=days))).fetchone()
+        return row is not None
 
     def prune(self, days: int = 400) -> None:
         self.conn.execute("DELETE FROM runs WHERE ts<?", (ago(days=30),))

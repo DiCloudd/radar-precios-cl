@@ -68,6 +68,36 @@ def daily_cleanup(store: PriceStore, force: bool = False) -> dict | None:
     return stats
 
 
+# ---------------------------------------------------------------- 2b. salón de la fama honesto
+def recheck_errors(store: PriceStore, days: int = 60) -> int:
+    """Re-evalúa los "errores de precio" registrados con las reglas ACTUALES: si una regla se corrigió (p.ej. la
+    "Sport Band" o los audífonos con referencia inflada por revendedores), el registro pasa a "descartado" y deja de
+    aparecer en la app y en /errores. Los Godzilla no se re-evalúan (dependen del historial de ese momento)."""
+    import json
+    from analysis import family_error, price_error_reasons
+    from models import Product
+    from storage import ago
+    rows = store.conn.execute(
+        "SELECT e.id, e.key, e.error_price, e.category, p.name, p.site, p.url, p.list_price, p.card_price, p.badges, "
+        "p.group_key FROM errors e JOIN products p ON p.key=e.key WHERE e.kind='price_error' "
+        "AND (e.outcome IS NULL OR e.outcome NOT LIKE 'descartado%') AND e.detected_ts>=?", (ago(days=days),)).fetchall()
+    n = 0
+    for r in rows:
+        cat = r["category"] or "celulares"
+        p = Product(r["key"], r["site"], r["name"], r["url"], r["error_price"], list_price=r["list_price"],
+                    card_price=r["card_price"], badges=json.loads(r["badges"]) if r["badges"] else [])
+        still = (price_error_reasons(p, cat, is_new=True) or price_error_reasons(p, cat, is_new=False, drop_pct=100)
+                 or family_error(store, p, r["group_key"], cat))
+        if not still:
+            store.conn.execute("UPDATE errors SET outcome='descartado (falso positivo, regla corregida)' WHERE id=?",
+                               (r["id"],))
+            n += 1
+    store.commit()
+    if n:
+        log.info("🏆 %d errores antiguos descartados como falsos positivos con las reglas actuales", n)
+    return n
+
+
 # ---------------------------------------------------------------- 3. tamaños
 def sizes(site_dir: Path = config.SITE_DIR) -> dict[str, float]:
     def mb(p: Path) -> float:
