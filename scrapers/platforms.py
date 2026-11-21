@@ -138,11 +138,18 @@ class MacOnlineScraper(Scraper):
             if not prices or not name:
                 continue
             model = re.sub(r"\s+-\s+[^-]+$", "", name)           # "iPhone 17 de 256 GB - Negro" -> sin color
-            if not model.lower().startswith(("iphone", "macbook", "imac", "ipad", "mac")):
+            if name.lower().startswith("apple watch"):            # "… con GPS - Caja de aluminio … de 42 mm - Correa …"
+                size = re.search(r"(\d{2})\s*mm", name)
+                metal = re.search(r"aluminio|titanio|acero", name, re.I)
+                model = " ".join(x for x in (name.split(" - ")[0], metal.group(0).lower() if metal else "",
+                                             f"{size.group(1)} mm" if size else "") if x)
+                model = re.sub(r"\s+", " ", model).strip()
+            if not model.lower().startswith(("iphone", "macbook", "imac", "ipad", "mac", "apple watch", "airpods")):
                 continue
             slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
             img = node.get("image")
-            p = Product(f"maconline:{slug}", self.site, f"Apple {model}", url, min(prices), brand="Apple",
+            p = Product(f"maconline:{slug}", self.site, model if model.lower().startswith("apple") else f"Apple {model}",
+                        url, min(prices), brand="Apple",
                         image=img[0] if isinstance(img, list) and img else img if isinstance(img, str) else None,
                         in_stock=ld_in_stock(node))
             if slug not in best or p.price < best[slug].price:

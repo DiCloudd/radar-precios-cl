@@ -13,7 +13,7 @@ from storage import Observation, PriceStore, ago
 
 @dataclass
 class Alert:
-    kind: str                      # godzilla | price_error | target | historic_low | drop | rise | stock_out | stock_back | missing | back
+    kind: str                      # godzilla | price_error | ganga | restock | restock_watch | target | historic_low | drop | rise | stock_* | missing | back
     obs: Observation | None
     title: str
     lines: list[str] = field(default_factory=list)
@@ -118,6 +118,8 @@ def is_accessory(name: str, category: str = "", store_category: str | None = Non
     if category == "audifonos":                          # ahí "audífonos" es el producto
         head = re.sub(r"aud[ií]fonos?", " ", head, flags=re.I)
         sc = re.sub(r"acc\.[\w.]*|accesori\w*", " ", sc, flags=re.I)
+    if category == "camaras":                            # "Kit Cámara Canon R50": el kit ES la cámara
+        head = re.sub(r"\bkit\b", " ", head, flags=re.I)
     return bool(ACCESSORY.search(head) or NON_PRODUCT.search(name) or _multi_generation(name)
                 or (sc and STORE_CAT_ACCESSORY.search(sc)))
 
@@ -139,6 +141,15 @@ TOO_CHEAP = {
     "smartwatches": (re.compile(r"apple watch|galaxy watch|pixel watch|garmin (fenix|forerunner|epix|venu)|"
                                 r"huawei watch (gt|\d)|amazfit (gtr|balance|t-rex)", re.I), 50_000),
     "electro": (re.compile(r"refrigerador|lavadora|secadora|side by side|french door|no frost", re.I), 100_000),
+    # solo marcas reales: los monitores genéricos de 7" para auto o de 19" cuestan $40–60k de verdad
+    "monitores": (re.compile(r"\b(samsung|odyssey|lg|ultragear|asus|\brog\b|\btuf\b|aoc|dell|alienware|lenovo|msi|"
+                             r"gigabyte|philips|viewsonic|benq|xiaomi|hp|acer|predator)\b", re.I), 40_000),
+    "camaras": (re.compile(r"\beos\b|\balpha\b|\ba6\d00\b|\ba7|\blumix\b|nikon z|\bz ?(5|6|8|9|30|50|fc)\b|"
+                           r"fujifilm x|\bx-?(t|s|h)\d|gopro|\bhero ?1\d|osmo|dji (mini|air|mavic|avata|neo|flip)|"
+                           r"\bmavic\b|insta360|powershot", re.I), 100_000),
+    "impresion3d": (re.compile(r"impresora 3d.*(bambu|creality|elegoo|anycubic|prusa|flashforge|ender|halot|k1|"
+                               r"mars|saturn|kobra)|bambu lab", re.I), 60_000),
+    "movilidad": (re.compile(r"scooter|monopat[ií]n|bicicleta el[eé]ctrica", re.I), 80_000),
 }
 # Mínimos escalonados por gama (el mínimo fijo de la categoría es bajo para equipos de $1,5–3 M).
 TIERS = {
@@ -153,10 +164,14 @@ TIERS = {
     "electro": [(re.compile(r"french door|side by side", re.I), 300_000),
                 (re.compile(r"lavadora secadora|lavaseca", re.I), 200_000)],   # auditado: lavaseca 10/6 kg ≈ $290k
     "tablets": [(re.compile(r"ipad pro|galaxy tab s\d+ ?ultra|tab s1\d", re.I), 300_000)],
+    "monitores": [(re.compile(r"\boled\b|\b4k\b|\buhd\b|\b(3[2-9]|4\d)\s*(\"|''|”|pulg)|\b(2[4-9]\d|3\d\d|4\d\d) ?hz", re.I), 120_000)],
+    "camaras": [(re.compile(r"\ba7|eos r[1-8]\b|nikon z ?[5-9]|\bz ?[6-9]\b|x-?t[45]|mavic|dji air|avata", re.I), 500_000),
+                (re.compile(r"eos r(10|50|100)|\ba6\d00|z ?(30|50|fc)|x-?s20|dji mini|osmo pocket", re.I), 250_000)],
 }
 WHAT = {"consolas": "una consola", "notebooks": "un notebook", "televisores": "un televisor", "celulares": "un celular",
         "tablets": "una tablet", "audifonos": "unos audífonos", "smartwatches": "un smartwatch",
-        "electro": "un electrodoméstico"}
+        "electro": "un electrodoméstico", "monitores": "un monitor", "camaras": "una cámara/dron",
+        "impresion3d": "una impresora 3D", "movilidad": "un scooter eléctrico"}
 
 
 def too_cheap(name: str, category: str, price: int, list_price: int | None = None,
@@ -224,6 +239,43 @@ def family_error(store: PriceStore, p, gk: str | None, category: str) -> tuple[s
     ratio = config.PRICE_ERROR_RATIO if len(prices) >= 2 else config.PRICE_ERROR_RATIO * 0.75   # 1 sola ref: más estricto
     if p.price < ref * ratio:
         return f"{(1 - p.price / ref) * 100:.0f}% bajo lo que cuesta este modelo en el catálogo ({clp(int(ref))})", int(ref)
+    return None
+
+
+def bargain(store: PriceStore, p, gk: str | None, category: str) -> tuple[str, int] | None:
+    """🔥 Ganga: muy por debajo de lo que cuesta el modelo NUEVO en el catálogo (sirve también para seminuevos,
+    cuyo "precio normal" en tiendas como Entel es el del equipo nuevo al lanzarse y no sirve de referencia).
+    Devuelve (motivo, precio de referencia) o None."""
+    if not p.price or is_accessory(p.name, category, getattr(p, "store_category", None)) or _marketplace(p):
+        return None
+    fam = family_key(gk, category)
+    if not fam:
+        return None
+    refurb = fam.endswith(" reacond")
+    base = fam.removesuffix(" reacond")
+    rows = store.conn.execute(
+        "SELECT price, group_key FROM products WHERE key<>? AND missing_since IS NULL AND price>0 "
+        "AND (group_key=? OR group_key LIKE ?)", (p.key, base, base + " %")).fetchall()
+    exact = re.compile(re.escape(base) + r"( \d+gb)?$")              # solo equipos NUEVOS de ese modelo
+    prices = [r[0] for r in rows if exact.match(r[1] or "")]
+    if not prices:
+        return None
+    return bargain_vs(p.price, prices, refurb)
+
+
+def bargain_vs(price: int, new_prices: list[int], refurb: bool) -> tuple[str, int] | None:
+    """Regla pura de ganga (la usan las alertas y la app): precio vs mediana del modelo NUEVO."""
+    if not new_prices or not price:
+        return None
+    ref = statistics.median(new_prices)
+    if ref < config.GANGA_MIN_REF:
+        return None
+    ratio = config.GANGA_REFURB_RATIO if refurb else config.GANGA_NEW_RATIO
+    if len(new_prices) == 1:
+        ratio *= 0.9                                                     # 1 sola referencia: más estricto
+    if price <= ref * ratio:
+        what = "el mismo modelo nuevo" if refurb else "este modelo en el resto del catálogo"
+        return f"{(1 - price / ref) * 100:.0f}% más barato que {what} ({clp(int(ref))})", int(ref)
     return None
 
 
@@ -307,14 +359,15 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
             alerts.append(Alert("target", obs, "🎯 ¡PRECIO OBJETIVO!", [f"{t.label} ({clp(t.target_price)})"], 1))
             break
 
-    if is_real_historic_low(obs) and abs(obs.pct) >= 1:
+    if is_real_historic_low(obs) and (abs(obs.pct) >= 1 if watched else notable_drop(obs, half=True)):
         alerts.append(Alert("historic_low", obs, "🏆 MÍNIMO HISTÓRICO", [f"Mínimo anterior: {clp(obs.historic_min)}"], 2))
-    elif obs.direction == "down" and abs(obs.pct) >= config.MIN_CHANGE_PCT:
+    elif obs.direction == "down" and (abs(obs.pct) >= config.MIN_CHANGE_PCT if watched else notable_drop(obs)):
         alerts.append(Alert("drop", obs, "📉 Bajó de precio", [], 3))
     elif obs.direction == "up" and config.NOTIFY_ON_RISE and abs(obs.pct) >= config.MIN_CHANGE_PCT:
         alerts.append(Alert("rise", obs, "📈 Subió de precio", [], 6))
     elif (obs.previous_card and p.card_price and p.card_price < obs.previous_card
-          and (1 - p.card_price / obs.previous_card) * 100 >= config.MIN_CHANGE_PCT):
+          and (1 - p.card_price / obs.previous_card) * 100 >= (config.MIN_CHANGE_PCT if watched else config.DROP_ALERT_PCT)
+          and (watched or obs.previous_card - p.card_price >= config.DROP_ALERT_MIN_SAVING)):
         pct = (1 - p.card_price / obs.previous_card) * 100
         alerts.append(Alert("card_drop", obs, "💳 Bajó con tarjeta",
                             [f"💳 {clp(p.card_price)} con tarjeta de la tienda (antes {clp(obs.previous_card)}, -{pct:.0f}%)"], 3))
@@ -325,6 +378,16 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
     if watched and obs.was_missing:
         alerts.append(Alert("back", obs, "🔁 Volvió a aparecer en la tienda", [], 3))
     return alerts
+
+
+def notable_drop(obs: Observation, half: bool = False) -> bool:
+    """🔕 ¿Vale un aviso? (A5) >= 10 %, ahorro >= $10.000 y producto de $50.000+. half=True: mínimos históricos
+    (ya son especiales) con la mitad del porcentaje."""
+    if not obs.previous or obs.product.price >= obs.previous:
+        return False
+    pct = config.DROP_ALERT_PCT / (2 if half else 1)
+    return (abs(obs.pct) >= pct and obs.previous >= config.DROP_ALERT_MIN_PRICE
+            and obs.previous - obs.product.price >= config.DROP_ALERT_MIN_SAVING / (2 if half else 1))
 
 
 def _group(store: PriceStore, key: str) -> str:

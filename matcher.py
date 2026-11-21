@@ -26,6 +26,8 @@ gray grey silver gold pink navy charcoal midnight starlight awesome cosmic phant
 ice lime graphite burdeo crema ocean sky marine jade obsidian porcelain titanium desert
 """.split())
 REFURB = re.compile(r"reacondicionad|refurb|seminuevo|open box|usado", re.I)
+REFURB_WORDS = {"reacondicionado", "reacondicionada", "reacondicionados", "seminuevo", "seminueva", "refurbished",
+                "refurb", "usado", "usada"}
 
 
 def _ascii(s: str) -> str:
@@ -75,7 +77,7 @@ def group_key(name: str, brand: str | None = None, category: str = "celulares") 
               if t not in NOISE and (not t.isdigit() or len(t) <= 4)]
     b = _ascii((brand or "").lower()).strip()
     b = BRANDS.get(b, b) if b else next((BRANDS[t] for t in tokens if t in BRANDS), "")
-    tokens = [t for t in tokens if t != b and t not in ("reacondicionado", "reacondicionada")]
+    tokens = [t for t in tokens if t != b and t not in REFURB_WORDS]     # "seminuevo" no es parte del modelo
     if b == "apple":
         tokens = [t for t in tokens if t != "apple"]
     model = " ".join(list(dict.fromkeys(tokens))[:6])         # sin duplicados, máx 6 tokens

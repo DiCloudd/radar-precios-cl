@@ -129,6 +129,19 @@ async def run_loop(args) -> None:
     crawler = Crawler(mon)
     crawl_task = asyncio.create_task(crawler.run(bot_stop)) if config.CRAWL else None   # 🔄 catálogo completo
     mon.crawling = crawl_task is not None              # el 1er escaneo profundo ya no repite lo que rastrea
+    import restock
+    try:
+        from storage import PriceStore
+        with PriceStore(config.DB_PATH) as store:
+            if not store.get_meta(f"{restock.META}:seeded"):          # 1 sola vez: gangas que YA estaban agotadas
+                added = restock.seed(store)
+                log.info("👀 Vigilancia de stock: %d gangas agotadas", len(added))
+                if added:
+                    mon.notifier.send(restock.seed_message(added))
+    except Exception:  # noqa: BLE001
+        log.exception("No se pudo sembrar la vigilancia de stock")
+    watcher = restock.RestockWatcher(mon)
+    watch_task = asyncio.create_task(watcher.run(bot_stop))   # 🚨 relee las gangas agotadas cada ~2 min
     log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)
     try:
         while not stop.is_set():
@@ -171,11 +184,12 @@ async def run_loop(args) -> None:
                 pass
     finally:
         bot_stop.set()
-        for t in (bot_task, crawl_task):
+        for t in (bot_task, crawl_task, watch_task):
             if t:
                 t.cancel()
-        await asyncio.gather(*(t for t in (bot_task, crawl_task) if t), return_exceptions=True)
+        await asyncio.gather(*(t for t in (bot_task, crawl_task, watch_task) if t), return_exceptions=True)
         log.info("🔄 Rastreador: %d páginas, %d productos en esta ventana", crawler.pages_done, crawler.products_seen)
+        log.info("🚨 Vigilancia de stock: %d relecturas en esta ventana", watcher.reads)
         await bot.aclose()
         await mon.aclose()
         if dirty:                      # nunca terminar con datos sin publicar (en Actions se perderían)

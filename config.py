@@ -37,6 +37,15 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 NOTIFY_MODE = os.getenv("NOTIFY_MODE", "changes").strip().lower()   # changes | always
 NOTIFY_ON_RISE = _bool("NOTIFY_ON_RISE", False)
 MIN_CHANGE_PCT = _float("MIN_CHANGE_PCT", 3)          # ignora variaciones menores (ruido)
+# 🔕 Telegram sin ruido: una bajada normal solo se avisa si es >= 10 %, ahorra >= $10.000 y el producto vale $50.000+
+# (los productos que sigues o con objetivo usan MIN_CHANGE_PCT; errores, Godzilla y gangas no tienen umbral)
+DROP_ALERT_PCT = _float("DROP_ALERT_PCT", 10)
+DROP_ALERT_MIN_PRICE = _float("DROP_ALERT_MIN_PRICE", 50_000)
+DROP_ALERT_MIN_SAVING = _float("DROP_ALERT_MIN_SAVING", 10_000)
+# 🔥 Ganga: precio <= X veces lo que cuesta el modelo NUEVO en el catálogo (mediana)
+GANGA_NEW_RATIO = _float("GANGA_NEW_RATIO", 0.50)
+GANGA_REFURB_RATIO = _float("GANGA_REFURB_RATIO", 0.45)    # seminuevo a menos de la mitad del nuevo
+GANGA_MIN_REF = _float("GANGA_MIN_REF", 150_000)
 DAILY_SUMMARY_HOUR = int(os.getenv("DAILY_SUMMARY_HOUR", "9"))      # hora Chile
 TIMEZONE = os.getenv("TZ_NAME", "America/Santiago")
 
@@ -147,4 +156,5 @@ SOURCES, WATCHES, TARGETS = _load()
 
 CATEGORY_LABELS = {"celulares": "📱 Celulares", "notebooks": "💻 Notebooks", "televisores": "📺 Televisores",
                    "consolas": "🎮 Consolas", "tablets": "📲 Tablets", "audifonos": "🎧 Audífonos",
-                   "smartwatches": "⌚ Smartwatches", "electro": "🧊 Electro"}
+                   "smartwatches": "⌚ Smartwatches", "electro": "🧊 Electro", "monitores": "🖥️ Monitores",
+                   "camaras": "📷 Cámaras y drones", "impresion3d": "🖨️ Impresoras 3D", "movilidad": "🛴 Movilidad"}

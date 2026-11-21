@@ -52,6 +52,10 @@ class EntelScraper(Scraper):
             if not pid or not price or pid in seen:
                 continue
             seen.add(pid)
+            brand = str(_first(attrs, "brand") or "").strip()
+            name = str(_first(attrs, "displayName", "description") or "").strip()
+            if brand and brand.lower() not in name.lower():          # Entel omite la marca: "14 Ultra 5G 512GB"
+                name = f"{brand} {name}"
             ref = parse_price(_first(attrs, "referencePrice"))
             inv = str(_first(attrs, "inventoryStatus") or "").upper()
             cuotas = _first(attrs, "installmentQty")
@@ -60,9 +64,9 @@ class EntelScraper(Scraper):
             if str(_first(attrs, "cyberDays")) == "1":
                 badges.append("Cyber")
             out.append(Product(
-                f"entel:{pid}", self.site, str(_first(attrs, "displayName", "description") or "").strip(),
+                f"entel:{pid}", self.site, name,
                 absolute("https://miportal.entel.cl", _first(attrs, "seoUrl")), price,
-                list_price=ref if ref and ref > price else None, brand=_first(attrs, "brand"),
+                list_price=ref if ref and ref > price else None, brand=brand or None,
                 image=absolute("https://miportal.entel.cl", img) if img else None,
                 in_stock=(inv == "IN_STOCK") if inv else None, stock_text=inv.replace("_", " ").title() or None,
                 installments=int(cuotas) if str(cuotas or "").isdigit() and str(_first(attrs, "showInstallmentQty")) == "1" else None,

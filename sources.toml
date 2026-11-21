@@ -3,7 +3,7 @@
 # ============================================================================
 #  [[source]]   listado/categoría de una tienda
 #     site       extractor a usar (ver scrapers/__init__.py)
-#     category   celulares | notebooks | televisores | consolas
+#     category   ver CATEGORY_LABELS en config.py (celulares, notebooks, monitores, camaras, …)
 #     max_pages  páginas a recorrer en el escaneo profundo
 #     fast       true = también en el ciclo rápido (~2 min, solo página 1); false = solo escaneo profundo (~13 min)
 #     enabled    false para desactivarla sin borrarla
@@ -758,6 +758,193 @@ max_pages = 1
 fast_every = 2
 fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
+
+
+# ============================== 🖥️ MONITORES (B1) =================================
+
+[[source]]
+name = "Falabella · Monitores ⚡"
+site = "falabella"
+category = "monitores"
+url = "https://www.falabella.com/falabella-cl/category/cat2062/Monitores?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "Falabella · Monitores"
+site = "falabella"
+category = "monitores"
+url = "https://www.falabella.com/falabella-cl/category/cat2062/Monitores"
+max_pages = 3
+fast = false
+
+[[source]]
+name = "PCFactory · Monitores ⚡"
+site = "pcfactory"
+category = "monitores"
+url = "https://www.pcfactory.cl/categoria/monitores?categorias=995&sort=precio,asc"
+max_pages = 1
+fast_every = 2
+
+[[source]]
+name = "PCFactory · Monitores"
+site = "pcfactory"
+category = "monitores"
+url = "https://www.pcfactory.cl/categoria/monitores?categorias=995"
+max_pages = 4
+fast = false
+
+[[source]]
+name = "Hites · Monitores ⚡"
+site = "hites"
+category = "monitores"
+url = "https://www.hites.com/tecnologia/computacion/monitores/?srule=price-low-to-high"
+max_pages = 1
+fast_every = 2
+fast_offset = 1
+
+[[source]]
+name = "Hites · Monitores"
+site = "hites"
+category = "monitores"
+url = "https://www.hites.com/tecnologia/computacion/monitores/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Samsung Store · Monitores"
+site = "samsung"
+category = "monitores"
+url = "https://www.samsung.com/cl/monitors/all-monitors/"
+max_pages = 1
+fast = false
+
+# ============================== 📷 CÁMARAS Y DRONES (B2) ==========================
+
+[[source]]
+name = "Falabella · Cámaras ⚡"
+site = "falabella"
+category = "camaras"
+url = "https://www.falabella.com/falabella-cl/category/cat18230032/Camaras-Profesionales?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 3
+
+[[source]]
+name = "Falabella · Cámaras"
+site = "falabella"
+category = "camaras"
+url = "https://www.falabella.com/falabella-cl/category/cat18230032/Camaras-Profesionales"
+max_pages = 3
+fast = false
+
+[[source]]
+name = "Falabella · Drones ⚡"
+site = "falabella"
+category = "camaras"
+url = "https://www.falabella.com/falabella-cl/category/cat7230062/Drones?sortBy=derived.price.search%2Casc"
+max_pages = 1
+fast_every = 3
+fast_offset = 1
+
+[[source]]
+name = "Falabella · Drones"
+site = "falabella"
+category = "camaras"
+url = "https://www.falabella.com/falabella-cl/category/cat7230062/Drones"
+max_pages = 3
+fast = false
+
+[[source]]
+name = "PCFactory · Cámaras mirrorless"
+site = "pcfactory"
+category = "camaras"
+url = "https://www.pcfactory.cl/categoria/mirrorless?categorias=708"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "PCFactory · Cámaras de acción"
+site = "pcfactory"
+category = "camaras"
+url = "https://www.pcfactory.cl/categoria/accion?categorias=619"
+max_pages = 1
+fast = false
+
+# ============================== 🖨️ IMPRESORAS 3D (B10) ============================
+
+[[source]]
+name = "PCFactory · Impresoras 3D"
+site = "pcfactory"
+category = "impresion3d"
+url = "https://www.pcfactory.cl/categoria/impresoras-3d?categorias=712"
+max_pages = 1
+fast = false
+
+# ============================== 🏬 MÁS DE LAS TIENDAS OFICIALES (B12) ============
+
+[[source]]
+name = "MacOnline · iPad"
+site = "maconline"
+category = "tablets"
+url = "https://www.maconline.com/#ipad"
+max_pages = 1            # una petición por modelo
+fast = false
+
+[[source]]
+name = "MacOnline · Apple Watch"
+site = "maconline"
+category = "smartwatches"
+url = "https://www.maconline.com/#apple-watch"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "MacOnline · AirPods"
+site = "maconline"
+category = "audifonos"
+url = "https://www.maconline.com/#airpods"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "Xiaomi Store · Televisores"
+site = "xiaomi"
+category = "televisores"
+url = "https://www.mi.com/cl/product-list/tvs-ha/"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "Xiaomi Store · Aspiradoras"
+site = "xiaomi"
+category = "electro"
+url = "https://www.mi.com/cl/product-list/vacuum-cleaner/"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "Xiaomi Store · Scooters"
+site = "xiaomi"
+category = "movilidad"
+url = "https://www.mi.com/cl/product-list/outdoor/"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "Samsung Store · Refrigeradores"
+site = "samsung"
+category = "electro"
+url = "https://www.samsung.com/cl/refrigerators/all-refrigerators/"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "Samsung Store · Lavadoras"
+site = "samsung"
+category = "electro"
+url = "https://www.samsung.com/cl/washers-and-dryers/all-washers-and-dryers/"
+max_pages = 1
+fast = false
 
 # ============================================================================
 #  [[watch]]  productos individuales (página de producto). Se revisan en cada

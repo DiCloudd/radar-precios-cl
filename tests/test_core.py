@@ -77,7 +77,7 @@ def test_godzilla(store):
 def test_historic_low_needs_history(store, monkeypatch):
     monkeypatch.setattr(config, "MIN_HISTORY_HOURS", 72)
     store.observe(P(100_000), "g", "src", ts(10))
-    obs = store.observe(P(95_000), "g", "src", ts(0))
+    obs = store.observe(P(88_000), "g", "src", ts(0))
     kinds = [a.kind for a in evaluate(obs, store, watched=False)]
     assert "historic_low" not in kinds and "drop" in kinds          # solo 10 h de historia
     store.observe(P(100_000, key="t:2"), "g", "src", ts(100))

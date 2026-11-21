@@ -36,6 +36,8 @@ def format_alert(a: Alert, site_labels: dict[str, str], fake: str | None = None)
         extra.append(f"normal <s>{clp(p.list_price)}</s>")
     if p.installments:
         extra.append(f"{p.installments} cuotas")
+    if p.in_stock is False:
+        extra.append("⛔ agotado")
     if extra:
         out.append("   " + " · ".join(extra))
     out += [f"   {line}" for line in a.lines]

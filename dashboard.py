@@ -12,7 +12,7 @@ from pathlib import Path
 
 import config
 import godzilla
-from analysis import fake_discount, predict
+from analysis import bargain_vs, fake_discount, family_key, predict
 from calendar_cl import active_event, upcoming
 from matcher import comparable
 from models import Product
@@ -54,6 +54,7 @@ def build_data(store: PriceStore) -> dict:
             "pred": predict(hist) if len(hist) >= 4 else None,
             "fake": fake_discount(obs, store) if prod.list_price else None,
         })
+    _mark_gangas(products)
     groups: dict[str, list] = {}
     for p in products:
         if p["group"] and not p["missing"]:
@@ -137,6 +138,11 @@ def build_data(store: PriceStore) -> dict:
         "categories": config.CATEGORY_LABELS,
         "errors": errors, "hall": hall, "ranking": ranking, "historyDays": history_days,
         "stores": stores, "products": products, "comparisons": comparisons[:300], "alerts": alerts,
+        # 🚨 gangas agotadas que el radar relee seguido (aviso inmediato si vuelve el stock)
+        "restock": [{"key": k, **{f: v.get(f) for f in ("name", "site", "price", "ref", "reason", "since", "url", "image")},
+                     "store": SITE_LABELS.get(v.get("site"), v.get("site"))}
+                    for k, v in sorted((store.get_meta("restock", {}) or {}).items(),
+                                       key=lambda kv: kv[1]["price"] / max(kv[1]["ref"], 1))],
         "totals": {"products": len(products), "active": sum(1 for p in products if not p["missing"]),
                    "drops24": sum(1 for p in products if p["ch24"] and p["ch24"] < 0),
                    "godzillas": sum(1 for a in alerts if a["kind"] in ("godzilla", "price_error")),
@@ -192,6 +198,30 @@ def export_files(data: dict, store: PriceStore, out: Path) -> None:
 CORE_LIMIT = 2500
 
 
+def _mark_gangas(products: list[dict]) -> None:
+    """🔥 p["ganga"] = {"why", "ref"} si está muy bajo lo que cuesta el modelo NUEVO (misma regla que las alertas,
+    calculada en memoria: 1 pasada en vez de 1 consulta por producto)."""
+    new: dict[str, list[int]] = {}
+    fams = {}
+    for p in products:
+        fam = family_key(p["group"], p["cat"]) if p["group"] and not p["missing"] else None
+        fams[p["key"]] = fam
+        if fam and not fam.endswith(" reacond"):
+            new.setdefault(fam, []).append(p["price"])
+    for p in products:
+        p["ganga"] = None
+        fam = fams[p["key"]]
+        if not fam or any(b.startswith("Vendedor: ") for b in p["badges"] or []):
+            continue
+        refurb = fam.endswith(" reacond")
+        refs = list(new.get(fam.removesuffix(" reacond"), []))
+        if not refurb and p["price"] in refs:
+            refs.remove(p["price"])                     # no compararse consigo mismo
+        hit = bargain_vs(p["price"], refs, refurb)
+        if hit:
+            p["ganga"] = {"why": hit[0], "ref": hit[1]}
+
+
 def _cat_counts(products: list[dict]) -> dict[str, int]:
     out: dict[str, int] = {}
     for p in products:
@@ -202,7 +232,8 @@ def _cat_counts(products: list[dict]) -> dict[str, int]:
 
 def core_products(data: dict) -> list[dict]:
     """Lo que la app necesita al abrir: ofertas, mínimos, sospechosas, comparador y errores (máx. CORE_LIMIT)."""
-    needed = {i["key"] for c in data["comparisons"] for i in c["items"]} | {e["key"] for e in data.get("errors", [])}
+    needed = ({i["key"] for c in data["comparisons"] for i in c["items"]} | {e["key"] for e in data.get("errors", [])}
+              | {r["key"] for r in data.get("restock", [])} | {p["key"] for p in data["products"] if p.get("ganga")})
     def score(p: dict) -> float:
         s = 0.0
         if p["key"] in needed:

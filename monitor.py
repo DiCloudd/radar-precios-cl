@@ -10,6 +10,7 @@ from datetime import datetime
 
 import config
 import godzilla
+import restock
 from analysis import Alert, clp, evaluate, fake_discount, is_accessory
 from calendar_cl import active_event
 from fetchers import BrowserPool, HttpFetcher
@@ -183,13 +184,24 @@ class Monitor:
         quiet_new: no alertar productos nunca vistos (1er barrido del rastreador)."""
         alerts: list[Alert] = []
         cat = src.category
+        watch = restock.load(store)
+        before = dict(watch)
         for p in products:
             gk = group_key(p.name, p.brand, cat)
             if is_accessory(p.name, cat):              # una correa no se compara con el reloj
                 gk = f"accesorio: {gk}"
             obs = store.observe(p, gk, src.name, ts, cat)
-            if not warming and not (quiet_new and obs.is_new):
-                alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets), targets, cat))
+            if warming:
+                continue
+            quiet = quiet_new and obs.is_new
+            found = [] if quiet else evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets), targets, cat)
+            # 🔥 gangas / 🚨 reposición (en silencio en el 1er barrido: solo se anotan para vigilarlas)
+            extra = restock.check(store, obs, gk, cat, src, watch, quiet=quiet)
+            if any(a.kind in ("price_error", "godzilla") for a in found):
+                extra = [a for a in extra if a.kind != "ganga"]        # ya sale como error de precio
+            alerts.extend(found + extra)
+        if watch != before:
+            store.set_meta(restock.META, restock.prune(watch))
         return alerts
 
     async def dispatch(self, store: PriceStore, alerts: list[Alert], ts: str, report: CycleReport | None = None) -> list[Alert]:
@@ -219,7 +231,14 @@ class Monitor:
             return alert_buttons(row[0]) if row else None
 
         big = [(a, t) for a, t in fresh if a.kind in ("godzilla", "price_error") and a.obs]
-        normal = [(a, t) for a, t in fresh if (a, t) not in big]
+        urgent = [(a, t) for a, t in fresh if a.kind in ("restock", "ganga", "restock_watch") and (a, t) not in big]
+        normal = [(a, t) for a, t in fresh if (a, t) not in big and (a, t) not in urgent]
+
+        # 🚨🔥 reposición de gangas y gangas: siempre al instante, una por mensaje con foto (nunca agrupadas)
+        for a, text in urgent:
+            row = row_of(a)
+            image = (a.obs.product.image if a.obs else None) or (row[2] if row else None)
+            self.notifier.send_photo(image, text, buttons(a)) if image else self.notifier.send(text, buttons(a))
 
         # ✅ verificación instantánea de todos los errores en paralelo
         verdicts = await asyncio.gather(*(self.verifier.verify(a.obs.product) for a, _ in big)) if big else []
