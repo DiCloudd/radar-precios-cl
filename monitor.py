@@ -17,7 +17,9 @@ from matcher import group_key
 from models import ScrapeResult
 from notifier import TelegramNotifier, chunk, format_alert
 from scrapers import SCRAPERS, SITE_LABELS, FetchContext
+import userprefs
 from storage import PriceStore, ago, now_iso
+from telegram_bot import alert_buttons
 
 log = logging.getLogger("monitor")
 
@@ -35,12 +37,12 @@ class CycleReport:
         return [r for r in self.results if not r.ok and not r.skipped and not r.blocked]
 
 
-def _watch_sources() -> list[config.Source]:
-    return [config.Source(w.name, w.url, "watch") for w in config.WATCHES]
+def _watch_sources(store: PriceStore) -> list[config.Source]:
+    return [config.Source(w.name, w.url, "watch") for w in userprefs.all_watches(store)]
 
 
-def _is_watched(key: str, name: str, site: str) -> bool:
-    return key.startswith("url:") or any(t.matches(key, name, site) for t in config.TARGETS)
+def _is_watched(key: str, name: str, site: str, targets: list) -> bool:
+    return key.startswith("url:") or any(t.matches(key, name, site) for t in targets)
 
 
 class Monitor:
@@ -111,7 +113,8 @@ class Monitor:
         ts = now_iso()
         with PriceStore(config.DB_PATH) as store:
             jobs, skipped = [], []
-            for src in config.SOURCES + _watch_sources():
+            targets = userprefs.all_targets(store)          # sources.toml + los creados en Telegram
+            for src in config.SOURCES + _watch_sources(store):
                 if src.site not in SCRAPERS:
                     log.error("Extractor desconocido '%s' en %s", src.site, src.name)
                     continue
@@ -135,11 +138,11 @@ class Monitor:
                 for p in res.products:
                     seen.add(p.key)
                     obs = store.observe(p, group_key(p.name, p.brand), res.source.name, ts)
-                    report.alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site)))
+                    report.alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets), targets))
                 # desaparecidos: solo si se recorrió la categoría completa (si no, es ruido de paginación)
                 if mode == "deep" and res.ok and res.full_coverage:
                     for row in store.mark_missing(res.source.name, seen, ts):
-                        if _is_watched(row["key"], row["name"], row["site"]):
+                        if _is_watched(row["key"], row["name"], row["site"], targets):
                             system_alerts.append(Alert("missing", None, "👻 Desapareció de la tienda",
                                                        [f"<b>{row['name']}</b> ({SITE_LABELS.get(row['site'])})",
                                                         f"Último precio {clp(row['price'])}", row["url"]], 3))
@@ -154,6 +157,8 @@ class Monitor:
                 dedupe_key = a.key or a.title
                 if store.alerted_recently(dedupe_key, a.kind, a.price, config.ALERT_COOLDOWN_HOURS):
                     continue
+                if a.kind not in ("godzilla", "price_error") and userprefs.is_muted(store, a.key):
+                    continue                                   # 🔕 silenciado desde Telegram
                 fake = fake_discount(a.obs, store) if a.obs else None
                 text = format_alert(a, SITE_LABELS, fake)
                 store.add_alert(dedupe_key, a.kind, a.price, text, ts)
@@ -165,10 +170,23 @@ class Monitor:
         return report
 
     def _notify(self, fresh: list[tuple[Alert, str]], report: CycleReport, store: PriceStore) -> None:
+        def buttons(a: Alert) -> dict | None:
+            if not a.obs:
+                return None
+            row = store.conn.execute("SELECT rowid FROM products WHERE key=?", (a.key,)).fetchone()
+            return alert_buttons(row[0]) if row else None
+
         big = [(a, t) for a, t in fresh if a.kind in ("godzilla", "price_error")]
-        rest = [t for a, t in fresh if a.kind not in ("godzilla", "price_error")]
-        for a, text in big:   # 🦖 cada Godzilla va solo, con GIF
-            self.notifier.send_animation(godzilla.asset(), text)
+        normal = [(a, t) for a, t in fresh if a.kind not in ("godzilla", "price_error")]
+        for a, text in big:   # 🦖 cada Godzilla va solo, con GIF y botones
+            self.notifier.send_animation(godzilla.asset(), text, buttons(a))
+        # pocas alertas -> una por mensaje con botones 📊🎯🔕; muchas -> agrupadas (evita spam)
+        rest = []
+        if len(normal) <= 8:
+            for a, text in normal:
+                self.notifier.send(text, buttons(a))
+        else:
+            rest = [t for _, t in normal]
         header = f"🛒 <b>Monitor de precios</b> · {datetime.now():%d-%m %H:%M}"
         if config.NOTIFY_MODE == "always" and report.mode == "deep":
             listing = []

@@ -69,3 +69,21 @@ Ver todos los comandos: `python main.py --help`.
 | Apple Store | tarjetas `rf-hcard` ("Desde $X") | precio base por modelo |
 | ~~Movistar~~ | — | robots.txt prohíbe bots |
 | ~~Ripley~~, ~~MercadoLibre~~ | — | bloqueo explícito |
+
+## 🤖 Bot de Telegram
+
+1. En Telegram, habla con **@BotFather** → `/newbot` → copia el token.
+2. GitHub → *Settings → Secrets and variables → Actions → New repository secret*: `TELEGRAM_BOT_TOKEN`.
+3. Envía `/start` a tu bot: ese chat queda como dueño (no hace falta `TELEGRAM_CHAT_ID`; el bot ignora a cualquier otro chat).
+
+| Comando | Qué hace |
+|---|---|
+| `/precio galaxy a57` | precios del más barato al más caro, con botones de gráfico |
+| `/top` | mayores bajadas 24 h |
+| `/comparar iphone 17 256` | mismo modelo en todas las tiendas |
+| `/grafico iphone 17` | gráfico PNG del historial |
+| `/objetivo 350000 galaxy a57` · `/objetivos` · `/borrar 1` | precios objetivo |
+| `/seguir <link>` · `/siguiendo` · `/dejar 1` | vigilar un producto puntual (stock, desaparece, baja) |
+| `/estado` · `/resumen` | salud de tiendas · resumen del día |
+
+Bajo cada alerta: **📊 Historial** · **🎯 Avisar -5 %** · **🔕 24 h**. El bot responde al instante durante cada ventana de GitHub Actions; lo que escribas entre ventanas se contesta al iniciar la siguiente.

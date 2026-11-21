@@ -10,6 +10,7 @@
     python main.py --build-site      # regenera el dashboard local (data/site/index.html)
     python main.py --publish         # genera y publica el dashboard en GitHub Pages
     python main.py --test-telegram   # prueba la conexión con el bot
+    python main.py --bot             # solo el bot de Telegram (comandos /precio, /top, /objetivo...)
     python main.py --godzilla-test   # 🦖 envía una alerta Godzilla de prueba
 
 Código de salida: 0 = todas las fuentes OK, 1 = alguna falló (útil para cron / Task Scheduler / CI).
@@ -106,6 +107,9 @@ async def run_loop(args) -> None:
     last_deep = last_pub = 0.0
     dirty = False                      # hay datos nuevos sin publicar
     deadline = time.time() + args.duration * 60 if args.duration else None
+    from telegram_bot import TelegramBot
+    bot, bot_stop = TelegramBot(), asyncio.Event()
+    bot_task = asyncio.create_task(bot.run(bot_stop)) if bot.enabled else None   # 🤖 responde en paralelo
     log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)
     try:
         while not stop.is_set():
@@ -141,10 +145,28 @@ async def run_loop(args) -> None:
             except asyncio.TimeoutError:
                 pass
     finally:
+        bot_stop.set()
+        if bot_task:
+            bot_task.cancel()
+            await asyncio.gather(bot_task, return_exceptions=True)
+        await bot.aclose()
         await mon.aclose()
         if dirty:                      # nunca terminar con datos sin publicar (en Actions se perderían)
             await asyncio.to_thread(_build_and_publish, True)
         log.info("Monitor detenido.")
+
+
+async def run_bot_only() -> None:
+    """Solo el bot (sin scrapear): útil para probar comandos en local."""
+    from telegram_bot import TelegramBot
+    bot = TelegramBot()
+    if not bot.enabled:
+        logging.error("Falta TELEGRAM_BOT_TOKEN en .env")
+        return
+    try:
+        await bot.run(asyncio.Event())
+    finally:
+        await bot.aclose()
 
 
 def main() -> int:
@@ -159,6 +181,7 @@ def main() -> int:
     ap.add_argument("--build-site", action="store_true", help="genera el dashboard local")
     ap.add_argument("--publish", action="store_true", help="genera y publica el dashboard")
     ap.add_argument("--test-telegram", action="store_true")
+    ap.add_argument("--bot", action="store_true", help="solo el bot de Telegram (responde comandos)")
     ap.add_argument("--godzilla-test", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
@@ -191,6 +214,9 @@ def main() -> int:
         return 0
     if args.loop:
         asyncio.run(run_loop(args))
+        return 0
+    if args.bot:
+        asyncio.run(run_bot_only())
         return 0
     return asyncio.run(run_once(args))
 

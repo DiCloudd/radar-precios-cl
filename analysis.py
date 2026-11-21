@@ -51,7 +51,8 @@ def is_real_historic_low(obs: Observation) -> bool:
             and _hours_since(obs.first_seen) >= config.MIN_HISTORY_HOURS)
 
 
-def evaluate(obs: Observation, store: PriceStore, watched: bool) -> list[Alert]:
+def evaluate(obs: Observation, store: PriceStore, watched: bool,
+             targets: list | None = None) -> list[Alert]:
     p = obs.product
     alerts: list[Alert] = []
 
@@ -77,7 +78,7 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool) -> list[Alert]:
         return alerts
 
     # 🎯 precio objetivo
-    for t in config.TARGETS:
+    for t in (config.TARGETS if targets is None else targets):
         if t.matches(p.key, p.name, p.site) and p.price <= t.target_price and (
                 obs.previous > t.target_price or obs.direction == "down"):
             alerts.append(Alert("target", obs, "🎯 ¡PRECIO OBJETIVO!", [f"{t.label} ({clp(t.target_price)})"], 1))

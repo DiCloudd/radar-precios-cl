@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 import time
 from pathlib import Path
@@ -59,9 +60,21 @@ def chunk(blocks: list[str], header: str) -> list[str]:
 
 
 class TelegramNotifier:
-    def __init__(self, token: str = config.TELEGRAM_BOT_TOKEN, chat_id: str = config.TELEGRAM_CHAT_ID,
+    def __init__(self, token: str = config.TELEGRAM_BOT_TOKEN, chat_id: str | None = None,
                  dry_run: bool = False) -> None:
-        self.token, self.chat_id, self.dry_run = token, chat_id, dry_run
+        self.token, self._chat, self.dry_run = token, chat_id, dry_run
+
+    @property
+    def chat_id(self) -> str | None:
+        """Chat fijo (.env/secret) o el que se registró enviando /start al bot (guardado en la BD)."""
+        if self._chat or config.TELEGRAM_CHAT_ID:
+            return self._chat or config.TELEGRAM_CHAT_ID
+        try:
+            from storage import PriceStore
+            with PriceStore(config.DB_PATH) as store:
+                return store.get_meta("tg:chat")
+        except Exception:  # noqa: BLE001
+            return None
 
     @property
     def live(self) -> bool:
@@ -84,24 +97,28 @@ class TelegramNotifier:
                 time.sleep(2 * (attempt + 1))
         return False
 
-    def send(self, text: str) -> bool:
+    def send(self, text: str, buttons: dict | None = None) -> bool:
         if not self.live:
             print("\n--- [consola] mensaje Telegram ---\n" + text + "\n--- fin ---")
             return True
-        ok = self._post("sendMessage", {"chat_id": self.chat_id, "text": text, "parse_mode": "HTML",
-                                        "disable_web_page_preview": "true"})
+        data = {"chat_id": self.chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+        if buttons:
+            data["reply_markup"] = json.dumps(buttons)
+        ok = self._post("sendMessage", data)
         time.sleep(1.1)  # ~1 msg/s por chat
         return ok
 
-    def send_animation(self, gif: Path, caption: str) -> bool:
+    def send_animation(self, gif: Path, caption: str, buttons: dict | None = None) -> bool:
         if not self.live:
             print(f"\n--- [consola] GIF {gif.name} + mensaje ---\n{caption}\n--- fin ---")
             return True
+        data = {"chat_id": self.chat_id, "caption": caption[:1024], "parse_mode": "HTML"}
+        if buttons:
+            data["reply_markup"] = json.dumps(buttons)
         with open(gif, "rb") as fh:
-            ok = self._post("sendAnimation", {"chat_id": self.chat_id, "caption": caption[:1024], "parse_mode": "HTML"},
-                            files={"animation": (gif.name, fh, "image/gif")})
+            ok = self._post("sendAnimation", data, files={"animation": (gif.name, fh, "image/gif")})
         time.sleep(1.1)
-        return ok or self.send(caption)
+        return ok or self.send(caption, buttons)
 
     def send_many(self, messages: list[str]) -> int:
         return sum(self.send(m) for m in messages)
