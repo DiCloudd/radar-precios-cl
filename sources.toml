@@ -360,6 +360,7 @@ site = "abc"
 category = "consolas"
 url = "https://www.abc.cl/tecnologia/mundo-gamer/consolas/?srule=price-low-to-high"
 max_pages = 1
+enabled = false          # nov-2026: Abc no tiene consolas ("No encontramos"). Reactivar cuando vuelvan.
 
 [[source]]
 name = "Hites · Consolas ⚡"

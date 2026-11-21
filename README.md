@@ -1,12 +1,13 @@
 # 📡 Radar de Precios Chile
 
-Monitor 24/7 de smartphones en **13 tiendas chilenas**, con historial, comparador entre tiendas, detector de ofertas falsas, alertas 🦖 Godzilla y dashboard web público. **Costo: $0.**
+Monitor 24/7 de **celulares, notebooks, televisores y consolas** en **13 tiendas chilenas**, con historial, comparador entre tiendas, detector de ofertas falsas, alertas 🦖 Godzilla y dashboard web público. **Costo: $0.**
 
 | | |
 |---|---|
 | 🏬 Tiendas | Falabella · Paris · PCFactory · Lider · Abc (La Polar) · Hites · Entel · Samsung Store · Apple Store · Motorola Store · Xiaomi Store · MacOnline · Multicentro |
+| ⚡ Trampa de errores | listados ordenados de menor a mayor precio, revisados cada ~2 min: un error de precio salta a la página 1 |
 | ⚡ Frecuencia | Página 1 de cada tienda cada ~2 min · todas las páginas cada ~20 min · x2 en CyberDay/Black Friday |
-| 🧠 Alertas | bajadas, mínimo histórico *real*, precio objetivo, 🦖 caídas ≥40 % en 24 h, 💥 posibles errores de precio, stock, desaparecidos |
+| 🧠 Alertas | 💥 errores de precio aunque el producto sea nuevo (−70 % sobre el normal, o "PS5 a $49.990"), bajadas, mínimo histórico *real*, precio objetivo, 🦖 caídas ≥40 % en 24 h, 💥 posibles errores de precio, stock, desaparecidos |
 | 🤡 Anti-chanta | detecta precios "normales" inflados y descuentos permanentes |
 | 📊 Dashboard | GitHub Pages: ofertas, comparador, gráficos, predicción, salud de tiendas, exportación Excel/CSV |
 | ☁️ Hosting | GitHub Actions (ventanas de 12 min cada 15 min, ciclos de ~2 min) + GitHub Pages. Sin tarjeta, sin PC |

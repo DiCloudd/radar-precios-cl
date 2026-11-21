@@ -42,7 +42,7 @@ def format_alert(a: Alert, site_labels: dict[str, str], fake: str | None = None)
     if fake:
         out.append(f"🤡 <i>Oferta sospechosa: {html.escape(fake)}</i>")
     if p.badges:
-        out.append("🏷️ " + html.escape(" · ".join(p.badges[:3])))
+        out.append("🏷️ " + html.escape(" · ".join(b[:40] for b in p.badges[:3])))
     out.append(f'🔗 <a href="{html.escape(p.url, quote=True)}">Ver producto</a>')
     return "\n".join(out)
 

@@ -56,7 +56,7 @@ class EntelScraper(Scraper):
             inv = str(_first(attrs, "inventoryStatus") or "").upper()
             cuotas = _first(attrs, "installmentQty")
             img = _first(attrs, "productImage")
-            badges = [b for b in [_first(attrs, "categoryDescription")] if b]
+            badges = [b for b in [_first(attrs, "categoryDescription")] if b and len(str(b)) <= 30]
             if str(_first(attrs, "cyberDays")) == "1":
                 badges.append("Cyber")
             out.append(Product(
