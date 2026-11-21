@@ -21,7 +21,7 @@ jobs:
     env:
       TZ: America/Santiago
       TZ_NAME: America/Santiago
-      RUNNER_NAME: github-actions
+      MONITOR_RUNNER: github-actions
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
       PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}

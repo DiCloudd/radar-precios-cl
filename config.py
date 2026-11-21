@@ -76,7 +76,7 @@ USER_AGENT = os.getenv(
 GH_TOKEN = os.getenv("GH_TOKEN", "").strip()
 GH_REPO = os.getenv("GH_REPO", "").strip()            # usuario/repositorio
 PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "").strip().rstrip("/")
-RUNNER_NAME = os.getenv("RUNNER_NAME", "local")
+RUNNER_NAME = os.getenv("MONITOR_RUNNER", "local")   # (RUNNER_NAME a secas lo pisa GitHub Actions)
 
 
 # ---------------------------------------------------------------- fuentes
