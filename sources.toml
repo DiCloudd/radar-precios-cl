@@ -13,6 +13,10 @@
 #     Movistar      -> robots.txt prohíbe todo a bots que no sean buscadores (queda enabled=false)
 #     MacCenter     -> el dominio ya no existe (DNS)
 #     Reifstore     -> el dominio está a la venta
+#     SP Digital, Tottus -> Cloudflare "Attention Required / Just a moment"
+#     Claro         -> Incapsula · Easy -> 403 · Corona -> no responde a IPs de la nube
+#     WOM           -> precios ligados a planes/portabilidad y catálogo estático diario: alertas engañosas
+#     Wei           -> casi no vende celulares
 # ============================================================================
 
 [[source]]
@@ -75,6 +79,32 @@ name = "Apple Store · iPhone"
 site = "apple"
 url = "https://www.apple.com/cl/shop/buy-iphone"
 max_pages = 1
+
+
+[[source]]
+name = "Motorola Store · Smartphones"
+site = "motorola"
+url = "https://www.motorola.cl/api/catalog_system/pub/products/search?fq=C:/1/"
+max_pages = 1            # API VTEX pública, hasta 50 por petición (categoría 1 = Smartphones, ~26 equipos)
+
+[[source]]
+name = "Xiaomi Store · Celulares"
+site = "xiaomi"
+url = "https://www.mi.com/cl/product-list/phone/"
+max_pages = 1            # precio "desde" de cada modelo
+
+[[source]]
+name = "MacOnline · iPhone"
+site = "maconline"
+url = "https://www.maconline.com/"
+max_pages = 1
+fast = false             # ~10 peticiones (una por modelo): solo en el escaneo profundo
+
+[[source]]
+name = "Multicentro · Celulares"
+site = "multicentro"
+url = "https://www.multicentro.cl/collections/celulares"
+max_pages = 1            # Shopify products.json (250 por página)
 
 
 # ============================================================================

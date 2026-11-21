@@ -2,10 +2,18 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Radar">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0e17" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Radar de Precios</title>
 <meta name="description" content="Monitor de precios de smartphones en tiendas chilenas, actualizado cada pocos minutos.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -28,7 +36,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Inter,system-ui,sans-serif}
 a{color:var(--accent);text-decoration:none}
-.wrap{max-width:1280px;margin:0 auto;padding:20px 16px 60px}
+.wrap{max-width:1280px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
 header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
 .logo{font-weight:800;font-size:22px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
 .logo .dot{width:10px;height:10px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 var(--good);animation:pulse 2s infinite}
@@ -106,7 +114,7 @@ dialog::backdrop{background:rgba(5,8,15,.6);backdrop-filter:blur(3px)}
 .exp a{display:block;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);color:var(--text)}
 .exp a b{display:block;font-size:15px;margin-bottom:4px}.exp a span{color:var(--muted);font-size:13px}
 footer{margin-top:30px;color:var(--muted);font-size:12.5px;text-align:center}
-@media (max-width:560px){.bar{grid-template-columns:90px 1fr 90px}.gz img{display:none}.price{font-size:20px}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(3,1fr);gap:8px}.kpi{padding:10px}.kpi .l{font-size:11px;line-height:1.25}input[type=search],select{font-size:16px}nav.tabs button{padding:9px 14px}.kpi .v{font-size:19px}.grid{grid-template-columns:1fr}.bar{grid-template-columns:90px 1fr 90px}.gz img{display:none}.price{font-size:20px}}
 </style>
 </head>
 <body>
@@ -116,6 +124,7 @@ footer{margin-top:30px;color:var(--muted);font-size:12.5px;text-align:center}
     <span class="pill" id="updated">cargando…</span>
     <span class="pill ev" id="event" hidden></span>
     <div class="spacer"></div>
+    <button class="btn" id="install" hidden>📲 Instalar</button>
     <button class="btn" id="theme" title="Cambiar tema">🌓</button>
   </header>
 
@@ -360,6 +369,16 @@ async function load() {
 }
 load();
 setInterval(load, 5 * 60e3);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });  // al volver a la app, datos frescos
+// iPhone: guía para agregar a la pantalla de inicio
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+if (isIOS && !standalone) {
+  $("#install").hidden = false;
+  $("#install").onclick = () => { $("#dlgbody").innerHTML = `<h3>📲 Instalar en tu iPhone</h3>
+    <ol style="line-height:1.9"><li>Toca <b>Compartir</b> <span style="font-size:18px">⎋</span> en la barra de Safari</li>
+    <li>Elige <b>“Agregar a pantalla de inicio”</b></li><li>Toca <b>Agregar</b>: el Radar queda como app 🎉</li></ol>
+    <button class="btn" onclick="document.getElementById('dlg').close()">Entendido</button>`; $("#dlg").showModal(); };
+}
 </script>
 </body>
 </html>

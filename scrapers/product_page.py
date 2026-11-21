@@ -11,7 +11,8 @@ from .base import Scraper
 
 SITE_BY_DOMAIN = {"falabella": "falabella", "paris": "paris", "pcfactory": "pcfactory", "lider": "lider",
                   "abc.cl": "abc", "hites": "hites", "entel": "entel", "movistar": "movistar",
-                  "samsung": "samsung", "apple": "apple"}
+                  "samsung": "samsung", "apple": "apple",
+                  "motorola": "motorola", "mi.com": "xiaomi", "maconline": "maconline", "multicentro": "multicentro"}
 
 
 def site_of(url: str) -> str:

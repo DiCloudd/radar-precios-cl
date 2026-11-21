@@ -118,6 +118,8 @@ class Monitor:
                 if src.site not in SCRAPERS:
                     log.error("Extractor desconocido '%s' en %s", src.site, src.name)
                     continue
+                if mode == "fast" and not src.fast:
+                    continue                                  # tienda pesada: solo en el escaneo profundo
                 pause = self._paused(store, src)
                 if pause:
                     skipped.append(ScrapeResult(src, skipped=pause))

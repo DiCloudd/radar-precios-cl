@@ -87,6 +87,7 @@ class Source:
     site: str
     max_pages: int = 1
     enabled: bool = True
+    fast: bool = True        # False = solo en escaneos profundos (tiendas que piden varias peticiones)
 
 
 @dataclass(frozen=True)
@@ -117,7 +118,8 @@ def _load() -> tuple[list[Source], list[Watch], list[Target]]:
     data = tomllib.loads(SOURCES_FILE.read_text(encoding="utf-8")) if SOURCES_FILE.exists() else {}
     override = int(os.getenv("MAX_PAGES", "0") or 0)
     sources = [
-        Source(s["name"], s["url"], s["site"], override or int(s.get("max_pages", 1)), bool(s.get("enabled", True)))
+        Source(s["name"], s["url"], s["site"], override or int(s.get("max_pages", 1)), bool(s.get("enabled", True)),
+               bool(s.get("fast", True)))
         for s in data.get("source", [])
     ]
     watches = [Watch(w["name"], w["url"], w.get("target_price")) for w in data.get("watch", [])]

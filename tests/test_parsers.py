@@ -110,3 +110,35 @@ def test_product_page_json_ld():
     ld = {"@type": "Product", "name": "Moto G", "offers": {"price": "129990", "availability": "OutOfStock"}}
     p = parse("watch", f'<script type="application/ld+json">{json.dumps(ld)}</script>', "https://www.paris.cl/moto.html").products[0]
     assert (p.key, p.site, p.price, p.in_stock) == ("url:https://www.paris.cl/moto.html", "paris", 129990, False)
+
+
+def test_motorola_vtex():
+    data = [{"productId": "278", "productName": "motorola edge 70 fusion", "brand": "Motorola",
+             "link": "https://www.motorola.cl/motorola-edge-70-fusion/p", "items": [{"images": [{"imageUrl": "https://x/i.png"}],
+             "sellers": [{"commertialOffer": {"Price": 449990.0, "ListPrice": 499990.0, "AvailableQuantity": 100,
+                                              "IsAvailable": True, "Installments": [{"NumberOfInstallments": 12, "InterestRate": 0}]}}]}]}]
+    p = parse("motorola", json.dumps(data)).products[0]
+    assert (p.key, p.name, p.price, p.list_price, p.in_stock, p.installments) == (
+        "motorola:278", "Motorola edge 70 fusion", 449990, 499990, True, 12)
+
+
+def test_multicentro_shopify():
+    data = {"products": [{"id": 9, "title": "Celular Motorola Moto G06 / 128 GB", "handle": "moto-g06", "vendor": "Motorola",
+                          "variants": [{"price": "99990", "compare_at_price": "109990", "available": True}], "images": []}]}
+    p = parse("multicentro", json.dumps(data), "https://www.multicentro.cl/collections/celulares/products.json?page=1").products[0]
+    assert (p.price, p.list_price, p.url) == (99990, 109990, "https://www.multicentro.cl/products/moto-g06")
+
+
+def test_xiaomi_json_ld():
+    ld = {"@type": "ItemList", "itemListElement": [{"item": {"@type": "Product", "name": "REDMI 17",
+          "url": "https://www.mi.com/cl/product/redmi-17/", "offers": {"price": "249990.00", "availability": "https://schema.org/InStock"}}}]}
+    p = parse("xiaomi", f'<script type="application/ld+json">{json.dumps(ld)}</script>').products[0]
+    assert (p.key, p.name, p.price) == ("xiaomi:redmi-17", "Xiaomi REDMI 17 (desde)", 249990)
+
+
+def test_maconline_groups_colors():
+    nodes = [{"@context": "https://schema.org/", "@type": "Product", "name": f"iPhone 17 de 256 GB - {c}",
+              "offers": {"price": str(pr)}} for c, pr in [("Negro", 1099990), ("Azul", 1089990)]]
+    nodes.append({"@type": "Product", "name": "iPhone 17 de 512 GB - Negro", "offers": {"price": "1349990.0"}})
+    ps = {p.name: p.price for p in parse("maconline", f'<script type="application/ld+json">{json.dumps(nodes)}</script>').products}
+    assert ps == {"Apple iPhone 17 de 256 GB": 1089990, "Apple iPhone 17 de 512 GB": 1349990}
