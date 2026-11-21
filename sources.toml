@@ -1,0 +1,102 @@
+# ============================================================================
+#  Qué monitorear. Edita este archivo; no hace falta tocar el código.
+# ============================================================================
+#  [[source]]   listado/categoría de una tienda
+#     site       extractor a usar (ver scrapers/__init__.py)
+#     max_pages  páginas a recorrer en el escaneo profundo (el rápido lee solo la 1)
+#     enabled    false para desactivarla sin borrarla
+#
+#  Tiendas descartadas (verificado nov-2026):
+#     Ripley        -> responde 403 "Blocked" a clientes automatizados
+#     MercadoLibre  -> exige verificación de cuenta; su API pública responde 403
+#     La Polar      -> ahora redirige a abc.cl (misma empresa), cubierta por "abc"
+#     Movistar      -> robots.txt prohíbe todo a bots que no sean buscadores (queda enabled=false)
+#     MacCenter     -> el dominio ya no existe (DNS)
+#     Reifstore     -> el dominio está a la venta
+# ============================================================================
+
+[[source]]
+name = "Falabella · Smartphones"
+site = "falabella"
+url = "https://www.falabella.com/falabella-cl/category/cat720161/Smartphones"
+max_pages = 3            # 48 por página
+
+[[source]]
+name = "Paris · Celulares"
+site = "paris"
+url = "https://www.paris.cl/tecnologia/celulares/"
+max_pages = 1            # Paris entrega siempre la página 1 a clientes automatizados
+
+[[source]]
+name = "PCFactory · Smartphones"
+site = "pcfactory"
+url = "https://www.pcfactory.cl/categoria/smartphones-y-wearables/smartphones"
+max_pages = 3            # 48 por página vía API (la categoría completa son ~2)
+
+[[source]]
+name = "Lider · Smartphones"
+site = "lider"
+url = "https://www.lider.cl/browse/tecnologia/celulares/smartphone/8175033_60412644_48497435"
+max_pages = 3            # 40 por página. Usa PerimeterX: a veces responde "Robot or human?" -> se pausa sola
+
+[[source]]
+name = "Abc (La Polar) · Smartphones"
+site = "abc"
+url = "https://www.abc.cl/tecnologia/celulares/smartphones/"
+max_pages = 3            # 36 por página
+
+[[source]]
+name = "Hites · Smartphones"
+site = "hites"
+url = "https://www.hites.com/celulares/smartphones/"
+max_pages = 3            # 36 por página
+
+[[source]]
+name = "Entel · Celulares"
+site = "entel"
+url = "https://miportal.entel.cl/personas/catalogo/celulares"
+max_pages = 4            # 24 por página
+
+[[source]]
+name = "Movistar · Celulares"
+site = "movistar"
+url = "https://catalogo.movistar.cl/tienda/celulares"
+max_pages = 1
+enabled = false          # su robots.txt solo permite buscadores (User-agent: * Disallow: /). Respetado.
+
+[[source]]
+name = "Samsung Store · Smartphones"
+site = "samsung"
+url = "https://www.samsung.com/cl/smartphones/all-smartphones/"
+max_pages = 1
+
+[[source]]
+name = "Apple Store · iPhone"
+site = "apple"
+url = "https://www.apple.com/cl/shop/buy-iphone"
+max_pages = 1
+
+
+# ============================================================================
+#  [[watch]]  productos individuales (página de producto). Se revisan en cada
+#  ciclo rápido y avisan si se agotan / desaparecen / vuelven.
+# ============================================================================
+# [[watch]]
+# name = "Mi Galaxy soñado"
+# url  = "https://www.paris.cl/samsung-galaxy-a57-5g-128gb-navy-MKS5469055.html"
+# target_price = 350000
+
+
+# ============================================================================
+#  [[target]]  precio objetivo por palabras clave (todas deben aparecer en el
+#  nombre) o por product_key exacto (ver el dashboard). site es opcional.
+# ============================================================================
+[[target]]
+label = "iPhone 17 bajo $800.000"
+keywords = ["iphone 17"]
+target_price = 800000
+
+[[target]]
+label = "Galaxy A57 bajo $350.000"
+keywords = ["galaxy", "a57"]
+target_price = 350000

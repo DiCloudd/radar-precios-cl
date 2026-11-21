@@ -1,0 +1,24 @@
+services:
+  monitor:
+    build: .
+    image: price-monitor:latest
+    container_name: price-monitor
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      RUNNER_NAME: oracle-santiago
+    volumes:
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Reinicia el monitor si el healthcheck lo marca "unhealthy" (Docker solo no lo hace).
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    container_name: autoheal
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

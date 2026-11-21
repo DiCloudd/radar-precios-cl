@@ -1,0 +1,181 @@
+"""Monitor de precios Chile 🇨🇱 — punto de entrada.
+
+    python main.py                   # un ciclo rápido (página 1 de cada tienda)
+    python main.py --deep            # un ciclo profundo (todas las páginas configuradas)
+    python main.py --loop            # modo 24/7: rápido cada ~2 min, profundo cada ~20, publica el dashboard
+    python main.py --dry-run         # no envía nada a Telegram (imprime en consola)
+    python main.py --summary         # envía el resumen diario ahora
+    python main.py --site falabella  # solo una tienda
+    python main.py --build-site      # regenera el dashboard local (data/site/index.html)
+    python main.py --publish         # genera y publica el dashboard en GitHub Pages
+    python main.py --test-telegram   # prueba la conexión con el bot
+    python main.py --godzilla-test   # 🦖 envía una alerta Godzilla de prueba
+
+Código de salida: 0 = todas las fuentes OK, 1 = alguna falló (útil para cron / Task Scheduler / CI).
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import logging
+import random
+import signal
+import sys
+import time
+from logging.handlers import RotatingFileHandler
+
+import config
+from analysis import clp
+from calendar_cl import active_event
+
+
+def setup_logging(verbose: bool) -> None:
+    fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG if verbose else logging.INFO)
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setFormatter(fmt)
+    fh = RotatingFileHandler(config.LOG_PATH, maxBytes=5_000_000, backupCount=3, encoding="utf-8")
+    fh.setFormatter(fmt)
+    root.handlers[:] = [sh, fh]
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+def print_report(rep) -> None:
+    print("\n" + "=" * 92)
+    print(f" CICLO {rep.mode.upper()}  ·  {rep.duration:.0f}s  ·  {len(rep.alerts)} alertas nuevas")
+    print("=" * 92)
+    for r in rep.results:
+        if r.ok:
+            ps = [p.price for p in r.products]
+            print(f" OK    {r.source.name:<30} {len(r.products):>4} prod. {r.pages}pág  "
+                  f"{clp(min(ps))} – {clp(max(ps))}  {r.duration:5.1f}s  {r.method}")
+        elif r.skipped:
+            print(f" PAUSA {r.source.name:<30} {r.skipped}")
+        else:
+            print(f" FAIL  {r.source.name:<30} {'[BLOQUEO] ' if r.blocked else ''}{r.error}")
+    print("=" * 92)
+
+
+async def run_once(args) -> int:
+    from monitor import Monitor
+    if args.site:
+        config.SOURCES[:] = [s for s in config.SOURCES if s.site == args.site]
+        config.WATCHES[:] = []
+    mon = Monitor(dry_run=args.dry_run)
+    try:
+        rep = await mon.cycle("deep" if args.deep else "fast")
+    finally:
+        await mon.aclose()
+    print_report(rep)
+    if args.publish or args.build_site:
+        _build_and_publish(publish=args.publish)
+    return 1 if rep.failed else 0
+
+
+def _build_and_publish(publish: bool) -> None:
+    from dashboard import build_site
+    from publisher import publish as do_publish
+    log = logging.getLogger("main")
+    try:
+        out = build_site()
+        log.info("Dashboard generado en %s", out / "index.html")
+        if publish:
+            do_publish(out)
+    except Exception as exc:  # noqa: BLE001 - publicar nunca debe detener el monitor
+        log.error("Error generando/publicando el dashboard: %s", exc)
+
+
+async def run_loop(args) -> None:
+    from monitor import Monitor
+    log = logging.getLogger("loop")
+    mon = Monitor(dry_run=args.dry_run)
+    stop = asyncio.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            asyncio.get_running_loop().add_signal_handler(sig, stop.set)
+        except NotImplementedError:   # Windows
+            pass
+    last_deep = last_pub = 0.0
+    log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)
+    try:
+        while not stop.is_set():
+            ev = active_event()
+            speed = config.EVENT_SPEEDUP if ev else 1.0
+            mode = "deep" if time.time() - last_deep >= config.DEEP_INTERVAL / speed else "fast"
+            if ev and mode == "deep":
+                log.info("🎉 Evento activo: %s (velocidad x%.1f)", ev.name, speed)
+            t0 = time.time()
+            try:
+                rep = await mon.cycle(mode)
+                print_report(rep)
+                if mode == "deep":
+                    last_deep = t0
+            except Exception:  # noqa: BLE001
+                log.exception("Ciclo falló; se reintenta en el siguiente")
+            if time.time() - last_pub >= config.PUBLISH_INTERVAL:
+                await asyncio.to_thread(_build_and_publish, True)
+                last_pub = time.time()
+            try:
+                mon.daily_summary()
+            except Exception:  # noqa: BLE001
+                log.exception("Resumen diario falló")
+            wait = max(10.0, config.FAST_INTERVAL / speed * random.uniform(0.75, 1.25) - (time.time() - t0))
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=wait)
+            except asyncio.TimeoutError:
+                pass
+    finally:
+        await mon.aclose()
+        log.info("Monitor detenido.")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Monitor de precios Chile con alertas a Telegram")
+    ap.add_argument("--deep", action="store_true", help="recorre todas las páginas configuradas")
+    ap.add_argument("--loop", action="store_true", help="modo 24/7")
+    ap.add_argument("--dry-run", action="store_true", help="no envía a Telegram")
+    ap.add_argument("--site", help="solo una tienda (falabella, paris, pcfactory, lider, abc, hites, entel, samsung, apple)")
+    ap.add_argument("--summary", action="store_true", help="envía el resumen diario ahora")
+    ap.add_argument("--build-site", action="store_true", help="genera el dashboard local")
+    ap.add_argument("--publish", action="store_true", help="genera y publica el dashboard")
+    ap.add_argument("--test-telegram", action="store_true")
+    ap.add_argument("--godzilla-test", action="store_true")
+    ap.add_argument("-v", "--verbose", action="store_true")
+    args = ap.parse_args()
+    setup_logging(args.verbose)
+
+    from publisher import restore_db_if_missing
+    restore_db_if_missing()
+
+    from notifier import TelegramNotifier
+    if args.test_telegram:
+        n = TelegramNotifier()
+        if not n.live:
+            logging.error("Faltan TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID en .env")
+            return 1
+        return 0 if n.send("✅ <b>Monitor de precios</b>: conexión con Telegram OK.") else 1
+    if args.godzilla_test:
+        import godzilla
+        TelegramNotifier(dry_run=args.dry_run).send_animation(
+            godzilla.asset(), "<b>🦖🔥 ALERTA GODZILLA (prueba) 🔥🦖</b>\nAsí se verá cuando un precio se desplome.")
+        return 0
+    if args.summary:
+        from monitor import Monitor
+        Monitor(dry_run=args.dry_run).daily_summary(force=True)
+        return 0
+    if args.build_site and not (args.deep or args.site):
+        _build_and_publish(publish=args.publish)
+        return 0
+    if args.publish and not (args.deep or args.site):
+        _build_and_publish(publish=True)
+        return 0
+    if args.loop:
+        asyncio.run(run_loop(args))
+        return 0
+    return asyncio.run(run_once(args))
+
+
+if __name__ == "__main__":
+    sys.exit(main())
