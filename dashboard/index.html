@@ -291,10 +291,11 @@ const views = {
     const q = state.q.trim().toLowerCase();
     const list = D.comparisons.filter(c => (!q || c.group.includes(q)) && (state.cat === "all" || c.cat === state.cat));
     if (!list.length) return `<div class="empty">No hay modelos repetidos entre tiendas con ese filtro.</div>`;
-    return list.slice(0, 80).map(c => {
+    const note = `<p class="sub">🏪 = vendedor externo del marketplace (no la tienda): revisa si es nuevo, reacondicionado o usado.</p>`;
+    return note + list.slice(0, 80).map(c => {
       const max = Math.max(...c.items.map(i => i.price));
       return `<div class="cmp"><h4>${esc(c.group)} <span class="tag down">ahorras ${clp(c.spread)}</span></h4>${c.items.map((i, n) =>
-        `<div class="bar ${n === 0 ? "best" : ""}"><span>${n === 0 ? "🥇 " : ""}${esc(i.store)}</span><div class="track"><div class="fill" style="width:${(i.price / max * 100).toFixed(1)}%"></div></div>
+        `<div class="bar ${n === 0 ? "best" : ""}"><span>${n === 0 ? "🥇 " : ""}${esc(i.store)}${i.seller ? `<br><small class="sub" title="Vendedor externo del marketplace: puede ser reacondicionado o usado aunque no lo diga">🏪 ${esc(i.seller)}</small>` : ""}</span><div class="track"><div class="fill" style="width:${(i.price / max * 100).toFixed(1)}%"></div></div>
          <a class="p" href="${esc(i.url)}" target="_blank" rel="noopener">${clp(i.price)}</a></div>`).join("")}</div>`;
     }).join("");
   },

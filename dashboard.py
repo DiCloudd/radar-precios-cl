@@ -57,15 +57,19 @@ def build_data(store: PriceStore) -> dict:
             groups.setdefault(p["group"], []).append(p)
     comparisons = []
     for g, items in groups.items():
-        if not comparable(g) or len({i["site"] for i in items}) < 2:
+        if not comparable(g) or g.startswith("accesorio") or len({i["site"] for i in items}) < 2:
             continue
         best_per_store: dict[str, dict] = {}            # una fila por tienda: su variante más barata
         for i in sorted(items, key=lambda i: i["price"]):
             best_per_store.setdefault(i["site"], i)
         items = sorted(best_per_store.values(), key=lambda i: i["price"])
+        if items[-1]["price"] > items[0]["price"] * 2.5:   # red de seguridad: casi seguro son productos distintos
+            continue
         comparisons.append({"group": g, "cat": items[0]["cat"], "best": items[0]["key"], "spread": items[-1]["price"] - items[0]["price"],
                             "median": statistics.median(i["price"] for i in items),
-                            "items": [{"key": i["key"], "store": i["store"], "price": i["price"], "url": i["url"]} for i in items]})
+                            "items": [{"key": i["key"], "store": i["store"], "price": i["price"], "url": i["url"],
+                                       "seller": next((b.split(": ", 1)[1].strip() for b in i["badges"] if b.startswith("Vendedor: ")), None)}
+                                      for i in items]})
     comparisons.sort(key=lambda c: -c["spread"])
 
     stores = []

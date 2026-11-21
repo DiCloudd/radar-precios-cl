@@ -33,13 +33,19 @@ def _ascii(s: str) -> str:
 
 
 _CODE = re.compile(r"\b(?=[a-z0-9-]*\d)(?=[a-z0-9-]*[a-z])[a-z0-9]+(?:-[a-z0-9]+)*\b")
-_NOT_CODE = re.compile(r"^(\d+(gb|tb|hz|w|mah|mp|cm|k|pulgadas)|\d+x\d+|ps\d|4k|8k|5g|4g|wifi\d*|usb\w*|"
-                       r"i[3579]|r[3579]|ddr\d|hdmi\d*|rtx\d+|gtx\d+|\d+(th|gen)|core\w*|ultra\d*)$")
+_NOT_CODE = re.compile(
+    r"^(\d+(gb|tb|hz|w|mah|mp|cm|mm|k|l|lts|kg|pulgadas)|\d+x\d+|ps\d|4k|8k|5g|4g|wifi\d*|usb\w*|ddr\d\w*|hdmi\d*|"
+    r"(i[3579]|r[3579]|u[579]|ultra[579]?)(-?\d+\w*)?|ryzen\w*|core\w*|rtx-?\d+\w*|gtx-?\d+\w*|rx-?\d+\w*|"
+    r"\d+(th|gen)|snapdragon\w*|dimensity\w*|helio\w*|exynos\w*|"
+    r"[a-z]+\d{1,2})$")       # "watch9", "series11", "galaxy25": nombre de familia, no código de modelo
 
 
 def model_code(name: str) -> str | None:
-    """Código de modelo (UN55DU7000, 82X1004GLM, CFI-2015): el identificador más fiable en TV, notebooks y consolas."""
-    cands = [t for t in _CODE.findall(_ascii(name or "").lower()) if len(t) >= 6 and not _NOT_CODE.match(t)]
+    """Código de modelo (UN55DU7000, 82X1004GLM, CFI-2015): el identificador más fiable en TV, notebooks y consolas.
+    Exige ≥3 dígitos y descarta procesadores (i7-13620H), GPUs y nombres de familia (Watch9): esos los comparten
+    productos distintos y producirían comparaciones falsas."""
+    cands = [t for t in _CODE.findall(_ascii(name or "").lower())
+             if len(t) >= 6 and sum(c.isdigit() for c in t) >= 3 and not _NOT_CODE.match(t)]
     return max(cands, key=len) if cands else None
 
 

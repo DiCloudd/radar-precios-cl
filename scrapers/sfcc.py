@@ -82,5 +82,5 @@ class HitesScraper(_SFCC):
                 list_price=max(nums) if nums and max(nums) > price else None,
                 card_price=card if card and card < price else None, brand=item.get("item_brand"),
                 image=img.attributes.get("src") if img else None,
-                badges=[item["promotion_name"]] if item.get("promotion_name") else []))
+                badges=[item["promotion_name"].strip()] if (item.get("promotion_name") or "").strip() else []))
         return PageResult(out, "SFCC tiles data-gtmselectitem")

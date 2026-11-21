@@ -58,7 +58,8 @@ ACCESSORY = re.compile(
     r"malet[ií]n|mouse|teclado|skin|film|vidrio|templad|control|joystick|\bjuegos?\b|repuesto|bater[ií]a|aud[ií]fonos?|"
     r"parlante|\bkit\b|accesorio|correa|malla|stand|\bhub\b|docking|memoria|disco|pendrive|antena|\brack\b|limpia|"
     r"l[aá]piz|stylus|tarjeta|gift|retro|tetris|pel[ií]cula|repisa|mueble|lente|cooler|ventilador|sticker|cubre|"
-    r"organizador|filtro|manguera|bandeja|frigobar|minibar|repelente", re.I)
+    r"organizador|filtro|manguera|bandeja|frigobar|minibar|repelente|\bband\b|pulsera|strap|cargador|dock|"
+    r"protector|mica|cristal templado", re.I)
 # (patrón que confirma que ES el producto, precio por debajo del cual huele a error)
 TOO_CHEAP = {
     "consolas": (re.compile(r"playstation|\bps[45]\b|xbox|nintendo|switch|steam deck|rog ally|legion go", re.I), 150_000),

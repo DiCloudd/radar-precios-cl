@@ -10,7 +10,7 @@ from datetime import datetime
 
 import config
 import godzilla
-from analysis import Alert, clp, evaluate, fake_discount
+from analysis import Alert, clp, evaluate, fake_discount, is_accessory
 from calendar_cl import active_event
 from fetchers import BrowserPool, HttpFetcher
 from matcher import group_key
@@ -153,7 +153,10 @@ class Monitor:
                 cat = res.source.category
                 for p in res.products:
                     seen.add(p.key)
-                    obs = store.observe(p, group_key(p.name, p.brand, cat), res.source.name, ts, cat)
+                    gk = group_key(p.name, p.brand, cat)
+                    if is_accessory(p.name, cat):              # una correa no se compara con el reloj
+                        gk = f"accesorio: {gk}"
+                    obs = store.observe(p, gk, res.source.name, ts, cat)
                     if not warming:
                         report.alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets),
                                                       targets, cat))

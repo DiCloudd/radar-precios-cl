@@ -154,3 +154,20 @@ def test_price_sorted_urls_keep_sort_on_every_page():
     assert "srule=price-low-to-high" in sf and "start=36" in sf
     pcf = SCRAPERS["pcfactory"]().page_url("https://www.pcfactory.cl/categoria/x/notebooks?categorias=425&sort=precio,asc", 1)
     assert "categorias=425" in pcf and "sort=precio%2Casc" in pcf and "page=0" in pcf
+
+
+# ---------------------------------------------------------------- confusiones del comparador (reportadas en el iPhone)
+@pytest.mark.parametrize("a,b,cat", [
+    ("Fabric Band Para Galaxy Watch9 Watch8 Mocha", "Samsung Galaxy Watch9 40mm Black", "smartwatches"),
+    ("Ideapad Slim 3 Intel Core i7-13620H 16GB 512GB", "Notebook V14 G5 Intel Core i7-13620H 16GB 512GB", "notebooks"),
+])
+def test_no_false_groups(a, b, cat):
+    ka, kb = group_key(a, None, cat), group_key(b, None, cat)
+    assert not (comparable(ka) and ka == kb)
+
+
+def test_strap_is_accessory():
+    from analysis import is_accessory
+    assert is_accessory("Fabric Band Para Galaxy Watch9", "smartwatches")
+    assert is_accessory("Correa Apple Watch 42mm", "smartwatches")
+    assert not is_accessory("Samsung Galaxy Watch9 40mm Black", "smartwatches")
