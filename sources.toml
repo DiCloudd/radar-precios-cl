@@ -684,6 +684,7 @@ category = "celulares"
 url = "https://www.falabella.com/falabella-cl/category/cat720161/Smartphones?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Notebooks 🆕"
@@ -692,6 +693,7 @@ category = "notebooks"
 url = "https://www.falabella.com/falabella-cl/category/cat70057/Notebooks?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Televisores 🆕"
@@ -700,6 +702,7 @@ category = "televisores"
 url = "https://www.falabella.com/falabella-cl/category/cat7190148/Televisores-LED?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Consolas 🆕"
@@ -708,6 +711,7 @@ category = "consolas"
 url = "https://www.falabella.com/falabella-cl/category/cat202303/Consolas?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Tablets 🆕"
@@ -716,6 +720,7 @@ category = "tablets"
 url = "https://www.falabella.com/falabella-cl/category/cat7230007/Tablets?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Audífonos 🆕"
@@ -724,6 +729,7 @@ category = "audifonos"
 url = "https://www.falabella.com/falabella-cl/category/cat1640002/Audifonos?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Smartwatches 🆕"
@@ -732,6 +738,7 @@ category = "smartwatches"
 url = "https://www.falabella.com/falabella-cl/category/cat4290063/Smartwatch?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Refrigeradores 🆕"
@@ -740,6 +747,7 @@ category = "electro"
 url = "https://www.falabella.com/falabella-cl/category/cat3205/Refrigeradores?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 [[source]]
 name = "Falabella · Lavadoras 🆕"
@@ -748,6 +756,7 @@ category = "electro"
 url = "https://www.falabella.com/falabella-cl/category/cat4060/Lavadoras?sortBy=product.attribute.newIconExpiryDate%2Cdesc"
 max_pages = 1
 fast_every = 2
+fast_offset = 1        # ciclos alternos a las ⚡ rotativas
 
 
 # ============================================================================

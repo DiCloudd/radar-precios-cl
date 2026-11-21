@@ -133,7 +133,7 @@ class Monitor:
                 if src.site not in SCRAPERS:
                     log.error("Extractor desconocido '%s' en %s", src.site, src.name)
                     continue
-                if mode == "fast" and (not src.fast or self.fast_count % src.fast_every):
+                if mode == "fast" and (not src.fast or (self.fast_count + src.fast_offset) % src.fast_every):
                     continue                                  # solo profundo, o le toca en otro ciclo rápido
                 if mode == "deep" and self.crawling and src in self._crawled:
                     continue                                  # el rastreador ya recorre todas sus páginas

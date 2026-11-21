@@ -176,7 +176,7 @@ def test_photo_falls_back_to_text(monkeypatch):
 
 def test_fast_every_rotation():
     src = config.Source("x", "https://x.cl", "abc", fast_every=2)
-    picks = [not (not src.fast or n % src.fast_every) for n in range(1, 7)]
+    picks = [not (not src.fast or (n + src.fast_offset) % src.fast_every) for n in range(1, 7)]
     assert picks == [False, True, False, True, False, True]
 
 
