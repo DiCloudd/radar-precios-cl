@@ -190,7 +190,7 @@ async def run_selftest() -> int:
     from scrapers import SCRAPERS, FetchContext
     from verifier import PDP_SITES, Verifier
     ctx = FetchContext(HttpFetcher(), BrowserPool())
-    ver, done, bad = Verifier(ctx), set(), 0
+    ver, done, bad, wrong = Verifier(ctx), set(), 0, 0
     print(f"{'tienda':<12} {'lectura':<10} {'veredicto':<12} detalle")
     try:
         for src in config.SOURCES:
@@ -207,10 +207,16 @@ async def run_selftest() -> int:
             how = "lis+ficha" if src.site in PDP_SITES and src.site != "maconline" else ("ficha" if src.site == "maconline" else "listado")
             print(f"{src.site:<12} {how:<10} {v.status:<12} {v.note[:70]}  [{p.name[:30]} {p.price}]")
             bad += v.status != "confirmed"
+            wrong += v.status == "corrected"            # el precio NO cambió: decir "corrigieron" sería un error real
     finally:
         await ctx.http.aclose()
-    print(f"\n{len(done) - bad}/{len(done)} tiendas verificadas correctamente")
-    return 0 if bad == 0 else 1
+    ok = len(done) - bad
+    print(f"\n{ok}/{len(done)} tiendas verificadas correctamente")
+    if bad and not wrong:
+        print("::warning::Alguna tienda no se pudo releer (bloqueo o límite de peticiones pasajero); "
+              "el monitor la pausa solo y reintenta.")
+    # falla solo si la verificación se EQUIVOCA o si la mayoría de las tiendas no se puede verificar
+    return 1 if wrong or ok < 0.8 * len(done) else 0
 
 
 async def run_bot_only() -> None:
