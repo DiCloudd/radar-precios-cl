@@ -3,113 +3,376 @@
 # ============================================================================
 #  [[source]]   listado/categoría de una tienda
 #     site       extractor a usar (ver scrapers/__init__.py)
-#     max_pages  páginas a recorrer en el escaneo profundo (el rápido lee solo la 1)
+#     category   celulares | notebooks | televisores | consolas
+#     max_pages  páginas a recorrer en el escaneo profundo
+#     fast       true = también en el ciclo rápido (~2 min, solo página 1); false = solo escaneo profundo (~13 min)
 #     enabled    false para desactivarla sin borrarla
 #
-#  Tiendas descartadas (verificado nov-2026):
-#     Ripley        -> responde 403 "Blocked" a clientes automatizados
+#  ⚡ = "trampa de errores": el listado ordenado de MENOR a MAYOR precio. Un error de precio
+#       (PS5 a $49.990) salta a la página 1, así que se detecta en ~2 min aunque la tienda tenga
+#       miles de productos. Los listados normales (orden de la tienda) alimentan el historial.
+#
+#  Presupuesto anti-bloqueo: ciclo rápido ≈ 25 peticiones / 2 min repartidas en ~12 dominios
+#  (máx. ~4 por dominio, separadas ≥4 s). Si agregas fuentes "fast", hazlo con moderación.
+#
+#  Tiendas descartadas (verificado nov-2026, desde IPs de la nube):
+#     Ripley        -> 403 "Blocked" / captcha
 #     MercadoLibre  -> exige verificación de cuenta; su API pública responde 403
-#     La Polar      -> ahora redirige a abc.cl (misma empresa), cubierta por "abc"
-#     Movistar      -> robots.txt prohíbe todo a bots que no sean buscadores (queda enabled=false)
-#     MacCenter     -> el dominio ya no existe (DNS)
-#     Reifstore     -> el dominio está a la venta
-#     SP Digital, Tottus -> Cloudflare "Attention Required / Just a moment"
-#     Claro         -> Incapsula · Easy -> 403 · Corona -> no responde a IPs de la nube
+#     La Polar      -> redirige a abc.cl (misma empresa), cubierta por "abc"
+#     Movistar      -> robots.txt prohíbe todo a bots que no sean buscadores
+#     SP Digital, Tottus, Weplay -> Cloudflare "Just a moment"
+#     Claro -> Incapsula · Easy -> 403 · HP -> captcha · Corona, Microplay -> no responden a la nube
+#     LG            -> precios solo con JavaScript (sin datos estructurados)
 #     WOM           -> precios ligados a planes/portabilidad y catálogo estático diario: alertas engañosas
-#     Wei           -> casi no vende celulares
+#     MacCenter, Reifstore -> ya no existen · Wei -> casi no vende celulares
 # ============================================================================
+
+
+# ============================== 📱 CELULARES ================================
+
+[[source]]
+name = "Falabella · Smartphones ⚡"
+site = "falabella"
+category = "celulares"
+url = "https://www.falabella.com/falabella-cl/category/cat720161/Smartphones?sortBy=derived.price.search%2Casc"
+max_pages = 1
 
 [[source]]
 name = "Falabella · Smartphones"
 site = "falabella"
+category = "celulares"
 url = "https://www.falabella.com/falabella-cl/category/cat720161/Smartphones"
 max_pages = 3            # 48 por página
+fast = false
 
 [[source]]
 name = "Paris · Celulares"
 site = "paris"
+category = "celulares"
 url = "https://www.paris.cl/tecnologia/celulares/"
-max_pages = 1            # Paris entrega siempre la página 1 a clientes automatizados
+max_pages = 1            # bloquea IPs de la nube (403); se pausa sola y reintenta
+
+[[source]]
+name = "PCFactory · Smartphones ⚡"
+site = "pcfactory"
+category = "celulares"
+url = "https://www.pcfactory.cl/categoria/smartphones-y-wearables/smartphones?sort=precio,asc"
+max_pages = 1
 
 [[source]]
 name = "PCFactory · Smartphones"
 site = "pcfactory"
+category = "celulares"
 url = "https://www.pcfactory.cl/categoria/smartphones-y-wearables/smartphones"
-max_pages = 3            # 48 por página vía API (la categoría completa son ~2)
+max_pages = 3            # 48 por página vía API (categoría completa)
+fast = false
 
 [[source]]
 name = "Lider · Smartphones"
 site = "lider"
+category = "celulares"
 url = "https://www.lider.cl/browse/tecnologia/celulares/smartphone/8175033_60412644_48497435"
-max_pages = 3            # 40 por página. Usa PerimeterX: a veces responde "Robot or human?" -> se pausa sola
+max_pages = 3            # PerimeterX: suele desafiar a la nube -> se pausa sola
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Smartphones ⚡"
+site = "abc"
+category = "celulares"
+url = "https://www.abc.cl/tecnologia/celulares/smartphones/?srule=price-low-to-high"
+max_pages = 1
 
 [[source]]
 name = "Abc (La Polar) · Smartphones"
 site = "abc"
+category = "celulares"
 url = "https://www.abc.cl/tecnologia/celulares/smartphones/"
 max_pages = 3            # 36 por página
+fast = false
+
+[[source]]
+name = "Hites · Smartphones ⚡"
+site = "hites"
+category = "celulares"
+url = "https://www.hites.com/celulares/smartphones/?srule=price-low-to-high"
+max_pages = 1
 
 [[source]]
 name = "Hites · Smartphones"
 site = "hites"
+category = "celulares"
 url = "https://www.hites.com/celulares/smartphones/"
 max_pages = 3            # 36 por página
+fast = false
 
 [[source]]
 name = "Entel · Celulares"
 site = "entel"
+category = "celulares"
 url = "https://miportal.entel.cl/personas/catalogo/celulares"
 max_pages = 4            # 24 por página
 
 [[source]]
 name = "Movistar · Celulares"
 site = "movistar"
+category = "celulares"
 url = "https://catalogo.movistar.cl/tienda/celulares"
 max_pages = 1
-enabled = false          # su robots.txt solo permite buscadores (User-agent: * Disallow: /). Respetado.
+enabled = false          # robots.txt solo permite buscadores. Respetado.
 
 [[source]]
 name = "Samsung Store · Smartphones"
 site = "samsung"
+category = "celulares"
 url = "https://www.samsung.com/cl/smartphones/all-smartphones/"
 max_pages = 1
 
 [[source]]
 name = "Apple Store · iPhone"
 site = "apple"
+category = "celulares"
 url = "https://www.apple.com/cl/shop/buy-iphone"
 max_pages = 1
-
 
 [[source]]
 name = "Motorola Store · Smartphones"
 site = "motorola"
+category = "celulares"
 url = "https://www.motorola.cl/api/catalog_system/pub/products/search?fq=C:/1/"
-max_pages = 1            # API VTEX pública, hasta 50 por petición (categoría 1 = Smartphones, ~26 equipos)
+max_pages = 1            # API VTEX pública (categoría 1 = Smartphones, ~26 equipos)
 
 [[source]]
 name = "Xiaomi Store · Celulares"
 site = "xiaomi"
+category = "celulares"
 url = "https://www.mi.com/cl/product-list/phone/"
-max_pages = 1            # precio "desde" de cada modelo
+max_pages = 1
 
 [[source]]
 name = "MacOnline · iPhone"
 site = "maconline"
-url = "https://www.maconline.com/"
+category = "celulares"
+url = "https://www.maconline.com/#iphone"
 max_pages = 1
-fast = false             # ~10 peticiones (una por modelo): solo en el escaneo profundo
+fast = false             # una petición por modelo
 
 [[source]]
 name = "Multicentro · Celulares"
 site = "multicentro"
+category = "celulares"
 url = "https://www.multicentro.cl/collections/celulares"
-max_pages = 1            # Shopify products.json (250 por página)
+max_pages = 1
+
+
+# ============================== 💻 NOTEBOOKS ================================
+
+[[source]]
+name = "Falabella · Notebooks ⚡"
+site = "falabella"
+category = "notebooks"
+url = "https://www.falabella.com/falabella-cl/category/cat70057/Notebooks?sortBy=derived.price.search%2Casc"
+max_pages = 1
+
+[[source]]
+name = "Falabella · Notebooks"
+site = "falabella"
+category = "notebooks"
+url = "https://www.falabella.com/falabella-cl/category/cat70057/Notebooks"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "PCFactory · Notebooks ⚡"
+site = "pcfactory"
+category = "notebooks"
+url = "https://www.pcfactory.cl/categoria/computadores-y-tablets/notebooks/notebooks?categorias=425&sort=precio,asc"
+max_pages = 1
+
+[[source]]
+name = "PCFactory · Notebooks"
+site = "pcfactory"
+category = "notebooks"
+url = "https://www.pcfactory.cl/categoria/computadores-y-tablets/notebooks/notebooks?categorias=425"
+max_pages = 3
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Notebooks ⚡"
+site = "abc"
+category = "notebooks"
+url = "https://www.abc.cl/tecnologia/computadores/notebooks/?srule=price-low-to-high"
+max_pages = 1
+
+[[source]]
+name = "Abc (La Polar) · Notebooks"
+site = "abc"
+category = "notebooks"
+url = "https://www.abc.cl/tecnologia/computadores/notebooks/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Hites · Notebooks ⚡"
+site = "hites"
+category = "notebooks"
+url = "https://www.hites.com/tecnologia/computacion/notebook/?srule=price-low-to-high"
+max_pages = 1
+
+[[source]]
+name = "Hites · Notebooks"
+site = "hites"
+category = "notebooks"
+url = "https://www.hites.com/tecnologia/computacion/notebook/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Samsung Store · Galaxy Book"
+site = "samsung"
+category = "notebooks"
+url = "https://www.samsung.com/cl/computers/all-computers/"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "MacOnline · MacBook"
+site = "maconline"
+category = "notebooks"
+url = "https://www.maconline.com/#macbook"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "Multicentro · Notebooks"
+site = "multicentro"
+category = "notebooks"
+url = "https://www.multicentro.cl/collections/computadores-y-notebook"
+max_pages = 1
+fast = false
+
+
+# ============================== 📺 TELEVISORES ==============================
+
+[[source]]
+name = "Falabella · Televisores ⚡"
+site = "falabella"
+category = "televisores"
+url = "https://www.falabella.com/falabella-cl/category/cat7190148/Televisores-LED?sortBy=derived.price.search%2Casc"
+max_pages = 1
+
+[[source]]
+name = "Falabella · Televisores"
+site = "falabella"
+category = "televisores"
+url = "https://www.falabella.com/falabella-cl/category/cat7190148/Televisores-LED"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "PCFactory · Smart TV ⚡"
+site = "pcfactory"
+category = "televisores"
+url = "https://www.pcfactory.cl/categoria/smart-tv-y-audio/smart-tv?categorias=789&sort=precio,asc"
+max_pages = 1
+
+[[source]]
+name = "PCFactory · Smart TV"
+site = "pcfactory"
+category = "televisores"
+url = "https://www.pcfactory.cl/categoria/smart-tv-y-audio/smart-tv?categorias=789"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Abc (La Polar) · Smart TV ⚡"
+site = "abc"
+category = "televisores"
+url = "https://www.abc.cl/tecnologia/televisores/smart-tv/?srule=price-low-to-high"
+max_pages = 1
+
+[[source]]
+name = "Abc (La Polar) · Smart TV"
+site = "abc"
+category = "televisores"
+url = "https://www.abc.cl/tecnologia/televisores/smart-tv/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Hites · Smart TV ⚡"
+site = "hites"
+category = "televisores"
+url = "https://www.hites.com/tecnologia/tv-video/televisores-smart-tv/?srule=price-low-to-high"
+max_pages = 1
+
+[[source]]
+name = "Hites · Smart TV"
+site = "hites"
+category = "televisores"
+url = "https://www.hites.com/tecnologia/tv-video/televisores-smart-tv/"
+max_pages = 2
+fast = false
+
+[[source]]
+name = "Samsung Store · Televisores"
+site = "samsung"
+category = "televisores"
+url = "https://www.samsung.com/cl/tvs/all-tvs/"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "Multicentro · Televisores"
+site = "multicentro"
+category = "televisores"
+url = "https://www.multicentro.cl/collections/televisores"
+max_pages = 1
+fast = false
+
+
+# ============================== 🎮 CONSOLAS =================================
+
+[[source]]
+name = "Falabella · Consolas ⚡"
+site = "falabella"
+category = "consolas"
+url = "https://www.falabella.com/falabella-cl/category/cat202303/Consolas?sortBy=derived.price.search%2Casc"
+max_pages = 1
+
+[[source]]
+name = "Falabella · Consolas"
+site = "falabella"
+category = "consolas"
+url = "https://www.falabella.com/falabella-cl/category/cat202303/Consolas"
+max_pages = 1
+fast = false
+
+[[source]]
+name = "PCFactory · Consolas ⚡"
+site = "pcfactory"
+category = "consolas"
+url = "https://www.pcfactory.cl/categoria/gamer-y-poder-grafico/consolas?categorias=438&sort=precio,asc"
+max_pages = 1
+
+[[source]]
+name = "Abc (La Polar) · Consolas ⚡"
+site = "abc"
+category = "consolas"
+url = "https://www.abc.cl/tecnologia/mundo-gamer/consolas/?srule=price-low-to-high"
+max_pages = 1
+
+[[source]]
+name = "Hites · Consolas ⚡"
+site = "hites"
+category = "consolas"
+url = "https://www.hites.com/tecnologia/videojuegos/consolas/?srule=price-low-to-high"
+max_pages = 1
 
 
 # ============================================================================
 #  [[watch]]  productos individuales (página de producto). Se revisan en cada
 #  ciclo rápido y avisan si se agotan / desaparecen / vuelven.
+#  (También puedes agregarlos desde Telegram con /seguir <link>)
 # ============================================================================
 # [[watch]]
 # name = "Mi Galaxy soñado"
@@ -119,7 +382,8 @@ max_pages = 1            # Shopify products.json (250 por página)
 
 # ============================================================================
 #  [[target]]  precio objetivo por palabras clave (todas deben aparecer en el
-#  nombre) o por product_key exacto (ver el dashboard). site es opcional.
+#  nombre) o por product_key exacto. site es opcional.
+#  (También desde Telegram: /objetivo 350000 galaxy a57)
 # ============================================================================
 [[target]]
 label = "iPhone 17 bajo $800.000"

@@ -43,6 +43,8 @@ TIMEZONE = os.getenv("TZ_NAME", "America/Santiago")
 # ---------------------------------------------------------------- análisis
 MIN_HISTORY_HOURS = _float("MIN_HISTORY_HOURS", 72)   # antes de esto no hay "mínimo histórico"
 GODZILLA_DROP_PCT = _float("GODZILLA_DROP_PCT", 40)   # caída vs máximo 24 h
+ERROR_DISCOUNT_PCT = _float("ERROR_DISCOUNT_PCT", 70)  # 💥 descuento sobre el precio normal que huele a error
+ERROR_MIN_LIST = _float("ERROR_MIN_LIST", 150000)      # ...solo si el precio normal era alto (evita accesorios)
 PRICE_ERROR_RATIO = _float("PRICE_ERROR_RATIO", 0.45) # precio < 45% de la mediana entre tiendas
 FAKE_LIST_RAISE_PCT = _float("FAKE_LIST_RAISE_PCT", 10)
 MISSING_HOURS = _float("MISSING_HOURS", 6)
@@ -88,6 +90,7 @@ class Source:
     max_pages: int = 1
     enabled: bool = True
     fast: bool = True        # False = solo en escaneos profundos (tiendas que piden varias peticiones)
+    category: str = "celulares"   # celulares | notebooks | televisores | consolas
 
 
 @dataclass(frozen=True)
@@ -119,7 +122,7 @@ def _load() -> tuple[list[Source], list[Watch], list[Target]]:
     override = int(os.getenv("MAX_PAGES", "0") or 0)
     sources = [
         Source(s["name"], s["url"], s["site"], override or int(s.get("max_pages", 1)), bool(s.get("enabled", True)),
-               bool(s.get("fast", True)))
+               bool(s.get("fast", True)), s.get("category", "celulares"))
         for s in data.get("source", [])
     ]
     watches = [Watch(w["name"], w["url"], w.get("target_price")) for w in data.get("watch", [])]
@@ -134,3 +137,6 @@ def _load() -> tuple[list[Source], list[Watch], list[Target]]:
 
 
 SOURCES, WATCHES, TARGETS = _load()
+
+CATEGORY_LABELS = {"celulares": "📱 Celulares", "notebooks": "💻 Notebooks", "televisores": "📺 Televisores",
+                   "consolas": "🎮 Consolas"}

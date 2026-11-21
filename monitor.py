@@ -132,15 +132,20 @@ class Monitor:
             for res in report.results:
                 if res.skipped and "pausada" in res.skipped:
                     continue
+                # calentamiento: la 1ª vez que corre una fuente solo se registra (evita una avalancha de alertas)
+                warming = not store.recent_runs(res.source.name, 1)
                 store.log_run(res, mode, config.RUNNER_NAME, ts)
                 for a in (self._update_breaker(store, res, ts), self._layout_watch(store, res, mode)):
                     if a:
                         system_alerts.append(a)
                 seen = set()
+                cat = res.source.category
                 for p in res.products:
                     seen.add(p.key)
-                    obs = store.observe(p, group_key(p.name, p.brand), res.source.name, ts)
-                    report.alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets), targets))
+                    obs = store.observe(p, group_key(p.name, p.brand, cat), res.source.name, ts, cat)
+                    if not warming:
+                        report.alerts.extend(evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets),
+                                                      targets, cat))
                 # desaparecidos: solo si se recorrió la categoría completa (si no, es ruido de paginación)
                 if mode == "deep" and res.ok and res.full_coverage:
                     for row in store.mark_missing(res.source.name, seen, ts):

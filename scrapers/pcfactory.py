@@ -13,7 +13,7 @@ from utils import parse_price, with_query
 from .base import FetchContext, Scraper
 
 API = "https://api.pcfactory.cl/pcfactory-services-catalogo/v1/catalogo/productos/query?page={page}&size=48&categorias={cat}"
-CATEGORY_IDS = {"smartphones": 5}   # agrega aquí otras categorías (o usa ?categorias=<id> en la URL)
+CATEGORY_IDS = {"smartphones": 5, "notebooks": 425, "smart-tv": 789, "consolas": 438}   # agrega aquí otras categorías (o usa ?categorias=<id> en la URL)
 
 
 class PCFactoryScraper(Scraper):
@@ -30,7 +30,9 @@ class PCFactoryScraper(Scraper):
 
     def page_url(self, base_url: str, n: int) -> str | None:
         self._human_base = base_url
-        return API.format(page=n - 1, cat=self._category(base_url))
+        url = API.format(page=n - 1, cat=self._category(base_url))
+        sort = parse_qs(urlsplit(base_url).query).get("sort")   # ⚡ ?sort=precio,asc -> más baratos primero
+        return with_query(url, sort=sort[0]) if sort else url
 
     async def fetch(self, ctx: FetchContext, url: str) -> PageResult:
         data = await ctx.http.get(url, accept="application/json, text/plain, */*", as_json=True)

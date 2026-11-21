@@ -117,8 +117,9 @@ class MacOnlineScraper(Scraper):
     MAX_MODELS = 14
 
     async def fetch(self, ctx: FetchContext, url: str) -> PageResult:
-        home = await ctx.http.get(url)
-        links = list(dict.fromkeys(re.findall(r'href="(/products/iphone[^"?#]*)"', home)))[: self.MAX_MODELS]
+        kind = urlsplit(url).fragment or "iphone"            # https://www.maconline.com/#macbook -> MacBooks
+        home = await ctx.http.get(url.split("#")[0])
+        links = list(dict.fromkeys(re.findall(rf'href="(/products/{re.escape(kind)}[^"?#]*)"', home)))[: self.MAX_MODELS]
         out: list[Product] = []
         for href in links:
             try:
@@ -137,6 +138,8 @@ class MacOnlineScraper(Scraper):
             if not prices or not name:
                 continue
             model = re.sub(r"\s+-\s+[^-]+$", "", name)           # "iPhone 17 de 256 GB - Negro" -> sin color
+            if not model.lower().startswith(("iphone", "macbook", "imac", "ipad", "mac")):
+                continue
             slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
             img = node.get("image")
             p = Product(f"maconline:{slug}", self.site, f"Apple {model}", url, min(prices), brand="Apple",

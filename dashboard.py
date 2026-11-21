@@ -39,6 +39,7 @@ def build_data(store: PriceStore) -> dict:
         obs = Observation(prod, None, None, min(prices), r["first_seen"], None, False)
         products.append({
             "key": r["key"], "site": r["site"], "store": SITE_LABELS.get(r["site"], r["site"]), "name": r["name"],
+            "cat": r["category"] or "celulares",
             "url": r["url"], "brand": r["brand"], "image": r["image"], "group": r["group_key"],
             "price": r["price"], "list": r["list_price"], "card": r["card_price"],
             "disc": round(prod.discount_pct, 1) if prod.discount_pct else None,
@@ -62,7 +63,7 @@ def build_data(store: PriceStore) -> dict:
         for i in sorted(items, key=lambda i: i["price"]):
             best_per_store.setdefault(i["site"], i)
         items = sorted(best_per_store.values(), key=lambda i: i["price"])
-        comparisons.append({"group": g, "best": items[0]["key"], "spread": items[-1]["price"] - items[0]["price"],
+        comparisons.append({"group": g, "cat": items[0]["cat"], "best": items[0]["key"], "spread": items[-1]["price"] - items[0]["price"],
                             "median": statistics.median(i["price"] for i in items),
                             "items": [{"key": i["key"], "store": i["store"], "price": i["price"], "url": i["url"]} for i in items]})
     comparisons.sort(key=lambda c: -c["spread"])
@@ -74,7 +75,7 @@ def build_data(store: PriceStore) -> dict:
         block = store.get_meta(f"block:{src.site}") or {}
         day = [r for r in runs if r["ts"] >= since24]
         stores.append({
-            "site": src.site, "name": src.name, "label": SITE_LABELS.get(src.site, src.site), "url": src.url,
+            "site": src.site, "name": src.name, "cat": src.category, "trap": "⚡" in src.name, "label": SITE_LABELS.get(src.site, src.site), "url": src.url,
             "lastTs": last["ts"] if last else None, "ok": bool(last["ok"]) if last else None,
             "n": last["n"] if last else 0, "method": last["method"] if last else None,
             "fallback": bool(last["fallback"]) if last else False, "error": last["error"] if last else None,
@@ -91,6 +92,7 @@ def build_data(store: PriceStore) -> dict:
         "event": ev.name if ev else None,
         "upcoming": [{"name": e.name, "start": e.start.isoformat(), "end": e.end.isoformat(), "estimated": e.estimated}
                      for e in upcoming()],
+        "categories": config.CATEGORY_LABELS,
         "stores": stores, "products": products, "comparisons": comparisons[:300], "alerts": alerts,
         "totals": {"products": len(products), "active": sum(1 for p in products if not p["missing"]),
                    "drops24": sum(1 for p in products if p["ch24"] and p["ch24"] < 0),

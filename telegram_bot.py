@@ -7,6 +7,7 @@ de la siguiente. El primer chat que envía /start queda como dueño; el bot igno
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import html
 import json
 import logging
@@ -28,7 +29,7 @@ from utils import parse_price
 log = logging.getLogger("telegram")
 
 COMMANDS = [
-    ("precio", "Buscar precios: /precio galaxy a57"),
+    ("precio", "Buscar: /precio galaxy a57 · /precio notebook lenovo · /precio ps5"),
     ("top", "Mayores bajadas de las últimas 24 h"),
     ("comparar", "Mismo modelo en todas las tiendas: /comparar iphone 17"),
     ("grafico", "Gráfico del historial: /grafico iphone 17 256"),
@@ -63,7 +64,9 @@ def search(store: PriceStore, query: str, limit: int = 8) -> list:
     if not words:
         return []
     rows = store.conn.execute("SELECT rowid AS rid, * FROM products WHERE missing_since IS NULL").fetchall()
-    hits = [r for r in rows if all(w in _norm(f"{r['name']} {r['brand'] or ''} {r['site']}") for w in words)]
+    hay = lambda r: _norm(f"{r['name']} {r['brand'] or ''} {r['site']} {r['category'] or ''} "
+                          f"{config.CATEGORY_LABELS.get(r['category'] or '', '')}")
+    hits = [r for r in rows if all(w in hay(r) for w in words)]
     return sorted(hits, key=lambda r: r["price"])[:limit]
 
 
@@ -98,9 +101,10 @@ class TelegramBot:
         me = await self.api("getMe")
         self.username = me["result"].get("username", "")
         with PriceStore(config.DB_PATH) as store:
-            if store.get_meta("tg:commands_v") != len(COMMANDS):
+            version = hashlib.md5(repr(COMMANDS).encode()).hexdigest()[:8]   # cambia si edito comandos
+            if store.get_meta("tg:commands_v") != version:
                 await self.api("setMyCommands", {"commands": [{"command": c, "description": d[:256]} for c, d in COMMANDS]})
-                store.set_meta("tg:commands_v", len(COMMANDS))
+                store.set_meta("tg:commands_v", version)
 
     async def poll_once(self, timeout: int = 0) -> int:
         with PriceStore(config.DB_PATH) as store:
@@ -174,7 +178,8 @@ class TelegramBot:
         lines = [f"🔎 <b>{html.escape(arg)}</b> — {len(rows)} resultado(s), del más barato:"]
         for i, r in enumerate(rows, 1):
             extra = f" · 💳 {clp(r['card_price'])}" if r["card_price"] else ""
-            lines.append(f"{i}. <b>{clp(r['price'])}</b> {SITE_LABELS.get(r['site'], r['site'])}{extra}\n"
+            emoji = config.CATEGORY_LABELS.get(r["category"] or "", "• x").split()[0]
+            lines.append(f"{i}. {emoji} <b>{clp(r['price'])}</b> {SITE_LABELS.get(r['site'], r['site'])}{extra}\n"
                          f"    <a href=\"{html.escape(r['url'], quote=True)}\">{html.escape(r['name'][:70])}</a>")
         buttons = {"inline_keyboard": [[{"text": f"📊 {i}", "callback_data": f"h:{r['rid']}"}
                                         for i, r in enumerate(rows[:5], 1)]]}

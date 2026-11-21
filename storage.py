@@ -82,6 +82,9 @@ class PriceStore:
         self.conn = sqlite3.connect(path, timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(products)")}
+        if "category" not in cols:                                   # migración v2
+            self.conn.execute("ALTER TABLE products ADD COLUMN category TEXT DEFAULT 'celulares'")
 
     def close(self) -> None:
         self.conn.close()
@@ -93,7 +96,8 @@ class PriceStore:
         self.close()
 
     # ---------------------------------------------------------------- productos
-    def observe(self, p: Product, group_key: str, source: str, ts: str | None = None) -> Observation:
+    def observe(self, p: Product, group_key: str, source: str, ts: str | None = None,
+                category: str = "celulares") -> Observation:
         ts = ts or now_iso()
         c = self.conn
         row = c.execute("SELECT * FROM products WHERE key=?", (p.key,)).fetchone()
@@ -107,17 +111,17 @@ class PriceStore:
                    or row["card_price"] != p.card_price)
         c.execute(
             """INSERT INTO products(key, site, name, url, brand, image, group_key, first_seen, last_seen, price,
-                   list_price, card_price, in_stock, stock_text, installments, badges, missing_since, source)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?)
+                   list_price, card_price, in_stock, stock_text, installments, badges, missing_since, source, category)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?)
                ON CONFLICT(key) DO UPDATE SET name=excluded.name, url=excluded.url,
                    brand=COALESCE(excluded.brand, products.brand), image=COALESCE(excluded.image, products.image),
                    group_key=excluded.group_key, last_seen=excluded.last_seen, price=excluded.price,
                    list_price=excluded.list_price, card_price=excluded.card_price, in_stock=excluded.in_stock,
                    stock_text=excluded.stock_text, installments=excluded.installments, badges=excluded.badges,
-                   missing_since=NULL, source=excluded.source""",
+                   missing_since=NULL, source=excluded.source, category=excluded.category""",
             (p.key, p.site, p.name, p.url, p.brand, p.image, group_key, ts, ts, p.price, p.list_price,
              p.card_price, None if p.in_stock is None else int(p.in_stock), p.stock_text, p.installments,
-             json.dumps(p.badges, ensure_ascii=False) if p.badges else None, source))
+             json.dumps(p.badges, ensure_ascii=False) if p.badges else None, source, category))
         if changed:   # historial compacto: solo se guarda cuando algo cambia
             c.execute("INSERT INTO prices(key, price, list_price, card_price, ts) VALUES (?,?,?,?,?)",
                       (p.key, p.price, p.list_price, p.card_price, ts))

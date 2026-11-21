@@ -1,6 +1,7 @@
 """Reglas de alerta: bajadas, mínimos reales, ofertas falsas, precio objetivo, stock y 🦖 Godzilla."""
 from __future__ import annotations
 
+import re
 import statistics
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -51,10 +52,51 @@ def is_real_historic_low(obs: Observation) -> bool:
             and _hours_since(obs.first_seen) >= config.MIN_HISTORY_HOURS)
 
 
+ACCESSORY = re.compile(
+    r"l[aá]mina|funda|carcasa|\bcase\b|protector|cargador|cable|adaptador|soporte|\bbase\b|mochila|bolso|malet[ií]n|"
+    r"mouse|teclado|skin|film|vidrio|templad|control|joystick|\bjuego|repuesto|bater[ií]a|aud[ií]fono|parlante|\bkit\b|"
+    r"accesorio|correa|stand|\bhub\b|docking|memoria|disco|\bssd\b|antena|\brack\b|limpia|l[aá]piz|stylus|tarjeta|gift|"
+    r"retro|\d+\s*en\s*1|tetris|pel[ií]cula|repisa|mueble|lente|cooler|ventilador|sticker|cubre", re.I)
+# (patrón que confirma que ES el producto, precio por debajo del cual huele a error)
+TOO_CHEAP = {
+    "consolas": (re.compile(r"playstation|\bps[45]\b|xbox|nintendo|switch|steam deck|rog ally|legion go", re.I), 150_000),
+    "notebooks": (re.compile(r"lenovo|\bhp\b|asus|acer|dell|macbook|galaxy book|\bmsi\b|huawei|gigabyte|lg gram|thinkpad|"
+                             r"ideapad|vivobook|zenbook|aspire|inspiron|pavilion|victus|omen|legion|\btuf\b|\brog\b", re.I), 150_000),
+    "televisores": (re.compile(r"\b(tv|televisor|smart ?tv)\b", re.I), 100_000),
+    "celulares": (re.compile(r"iphone 1[5-9]|iphone air|galaxy s2\d|galaxy z|pixel \d|pro max|xiaomi 1[5-9]", re.I), 150_000),
+}
+
+
+def too_cheap(name: str, category: str, price: int) -> str | None:
+    """💥 Precio absurdo para lo que es (ej. PS5 a $49.990), aunque el producto acabe de aparecer y no tenga historial."""
+    rule = TOO_CHEAP.get(category)
+    if not rule or ACCESSORY.search(name or ""):
+        return None
+    pattern, floor = rule
+    if not pattern.search(name or "") or price >= floor:
+        return None
+    if category == "televisores":                       # solo TVs de 43" o más (las chicas sí son baratas)
+        size = re.search(r"(\d{2})\s*(\"|''|”|pulg|pulgadas|\bpul\b)", name or "", re.I)
+        if not size or int(size.group(1)) < 43:
+            return None
+    return f"{clp(price)} es demasiado barato para {category[:-1] if category != 'televisores' else 'un televisor'} así"
+
+
 def evaluate(obs: Observation, store: PriceStore, watched: bool,
-             targets: list | None = None) -> list[Alert]:
+             targets: list | None = None, category: str = "celulares") -> list[Alert]:
     p = obs.product
     alerts: list[Alert] = []
+
+    # 💥 errores de precio que no necesitan historial (sirven para productos recién aparecidos)
+    if obs.is_new or obs.direction == "down":
+        if (p.list_price and p.list_price >= config.ERROR_MIN_LIST and p.discount_pct
+                and p.discount_pct >= config.ERROR_DISCOUNT_PCT and not ACCESSORY.search(p.name)):
+            alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?",
+                                [f"-{p.discount_pct:.0f}% sobre su precio normal ({clp(p.list_price)})"], 0))
+        else:
+            reason = too_cheap(p.name, category, p.price)
+            if reason:
+                alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO?", [reason], 0))
 
     # 🦖 GODZILLA: caída brutal vs el máximo de las últimas 24 h
     if not obs.is_new:

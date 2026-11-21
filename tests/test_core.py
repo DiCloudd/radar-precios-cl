@@ -111,3 +111,46 @@ def test_predict_shapes():
     hist = [(ts(24 * d), p) for d, p in [(40, 500), (30, 450), (20, 480), (10, 430), (1, 420)]]
     out = predict(hist)
     assert out["prob_drop_7d"] > 0 and out["best_weekday"]
+
+
+# ---------------------------------------------------------------- errores de precio y categorías
+from analysis import too_cheap
+from scrapers import SCRAPERS
+
+
+@pytest.mark.parametrize("name,cat,price,hit", [
+    ("Consola PlayStation 5 Slim Digital", "consolas", 49990, True),
+    ("Consola Nintendo Switch 2", "consolas", 389990, False),
+    ("Consola De Videojuegos Portátil 400 En 1", "consolas", 12990, False),      # retro barata: no es error
+    ("Control Joystick PS5 DualSense", "consolas", 29990, False),                 # accesorio
+    ("Notebook Lenovo IdeaPad Slim 3 Core i5 16GB", "notebooks", 99990, True),
+    ("Lamina protectora anti luz azul notebook", "notebooks", 11290, False),
+    ('Smart TV Samsung 65" Crystal UHD', "televisores", 59990, True),
+    ('Smart TV TCL 32" HD', "televisores", 59990, False),                         # TV chica: precio normal
+    ("Apple iPhone 17 Pro Max 256GB", "celulares", 99990, True),
+    ("Funda iPhone 17 Pro Max", "celulares", 9990, False),
+])
+def test_too_cheap(name, cat, price, hit):
+    assert bool(too_cheap(name, cat, price)) is hit
+
+
+def test_big_discount_error_even_if_new(store):
+    p = Product("t:9", "t", "Notebook Lenovo Legion 5", "https://t.cl/9", 129990, 1299990)
+    obs = store.observe(p, "g", "src", ts(0), "notebooks")
+    assert "price_error" in [a.kind for a in evaluate(obs, store, watched=False, category="notebooks")]
+
+
+def test_model_code_grouping():
+    a = group_key('Smart TV Samsung 55" Crystal UHD 4K UN55DU7000GXZS', "Samsung", "televisores")
+    b = group_key("Televisor Samsung UN55DU7000GXZS 55 Pulgadas", None, "televisores")
+    assert a == b == "un55du7000gxzs" and comparable(a)
+    assert not comparable(group_key("Lamina protectora notebook", None, "notebooks"))
+
+
+def test_price_sorted_urls_keep_sort_on_every_page():
+    fal = SCRAPERS["falabella"]().page_url("https://www.falabella.com/x/cat1/Y?sortBy=derived.price.search%2Casc", 2)
+    assert "sortBy=derived.price.search%2Casc" in fal and "page=2" in fal
+    sf = SCRAPERS["hites"]().page_url("https://www.hites.com/tv/?srule=price-low-to-high", 2)
+    assert "srule=price-low-to-high" in sf and "start=36" in sf
+    pcf = SCRAPERS["pcfactory"]().page_url("https://www.pcfactory.cl/categoria/x/notebooks?categorias=425&sort=precio,asc", 1)
+    assert "categorias=425" in pcf and "sort=precio%2Casc" in pcf and "page=0" in pcf

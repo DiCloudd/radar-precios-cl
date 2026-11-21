@@ -63,6 +63,8 @@ nav.tabs button.on{background:var(--text);color:var(--bg);border-color:var(--tex
 input[type=search],select{font:inherit;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0}
 input[type=search]{flex:1 1 240px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+#catchips{width:100%}
+#catchips .chip{font-size:13px;padding:6px 12px}
 .chip{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:600}
 .chip.on{background:var(--chip);color:var(--accent);border-color:var(--accent)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
@@ -151,6 +153,7 @@ footer{margin-top:30px;color:var(--muted);font-size:12.5px;text-align:center}
       <option value="-price">Precio mayor</option>
       <option value="new">Más recientes</option>
     </select>
+    <div class="chips" id="catchips"></div>
     <div class="chips" id="storechips"></div>
   </div>
 
@@ -166,7 +169,8 @@ const clp = n => n == null ? "–" : "$" + Math.round(n).toLocaleString("es-CL")
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const ago = iso => { if(!iso) return "nunca"; const m = (Date.now() - new Date(iso)) / 60000;
   return m < 1 ? "hace segundos" : m < 60 ? `hace ${Math.round(m)} min` : m < 1440 ? `hace ${Math.round(m/60)} h` : `hace ${Math.round(m/1440)} d`; };
-const state = { tab: "deals", q: "", sort: "ch24", stores: new Set(), page: 0 };
+const state = { tab: "deals", q: "", sort: "ch24", stores: new Set(), page: 0, cat: "all" };
+try { state.cat = localStorage.getItem("cat") || "all"; } catch (e) {}
 let D = null, chart = null;
 
 // ---- tema (preferencia por visitante)
@@ -215,7 +219,7 @@ function tags(p) {
 function cardHTML(p) {
   return `<div class="card" data-k="${esc(p.key)}">
     <div class="top">${p.image ? `<img loading="lazy" src="${esc(p.image)}" alt="" onerror="this.remove()">` : ""}
-      <div><div class="store">${esc(p.store)}</div><div class="nm">${esc(p.name)}</div></div></div>
+      <div><div class="store">${(D.categories[p.cat] || "").split(" ")[0]} ${esc(p.store)}</div><div class="nm">${esc(p.name)}</div></div></div>
     <div class="row"><span class="price">${clp(p.price)}</span>${p.list ? `<span class="old">${clp(p.list)}</span>` : ""}</div>
     <div class="row">${tags(p)}</div>
     ${spark(p.hist)}
@@ -224,7 +228,8 @@ function cardHTML(p) {
 
 function filtered() {
   const q = state.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return D.products.filter(p => !p.missing && (!state.stores.size || state.stores.has(p.site)) &&
+  return D.products.filter(p => !p.missing && (state.cat === "all" || p.cat === state.cat) &&
+    (!state.stores.size || state.stores.has(p.site)) &&
     q.every(w => (p.name + " " + (p.brand || "") + " " + p.store).toLowerCase().includes(w)));
 }
 function sorted(list) {
@@ -242,6 +247,18 @@ function kpis() {
   ].map(([v, l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
   const gz = D.alerts.find(a => a.kind === "godzilla" || a.kind === "price_error");
   if (gz && Date.now() - new Date(gz.ts) < 864e5) { $("#gz").style.display = "flex"; $("#gzmsg").innerHTML = safeHTML(gz.message).replace(/\n/g, "<br>"); }
+}
+
+function catChips() {
+  const cats = [["all", "Todo"], ...Object.entries(D.categories || {})];
+  $("#catchips").innerHTML = cats.map(([k, l]) => {
+    const n = k === "all" ? D.products.filter(p => !p.missing).length : D.products.filter(p => !p.missing && p.cat === k).length;
+    return `<button class="chip ${state.cat === k ? "on" : ""}" data-c="${k}">${esc(l)} <span style="opacity:.6">${n}</span></button>`;
+  }).join("");
+  $("#catchips").querySelectorAll(".chip").forEach(b => b.onclick = () => {
+    state.cat = b.dataset.c; state.page = 0;
+    try { localStorage.setItem("cat", state.cat); } catch (e) {}
+    catChips(); render(); });
 }
 
 function storeChips() {
@@ -271,7 +288,7 @@ const views = {
   },
   compare() {
     const q = state.q.trim().toLowerCase();
-    const list = D.comparisons.filter(c => !q || c.group.includes(q));
+    const list = D.comparisons.filter(c => (!q || c.group.includes(q)) && (state.cat === "all" || c.cat === state.cat));
     if (!list.length) return `<div class="empty">No hay modelos repetidos entre tiendas con ese filtro.</div>`;
     return list.slice(0, 80).map(c => {
       const max = Math.max(...c.items.map(i => i.price));
@@ -365,7 +382,7 @@ async function load() {
   const stale = Date.now() - new Date(D.generated) > 3 * 3600e3;
   $("#dot").style.background = stale ? "var(--warn)" : "var(--good)";
   if (D.event) { $("#event").hidden = false; $("#event").textContent = "🎉 " + D.event; }
-  kpis(); storeChips(); render();
+  kpis(); catChips(); storeChips(); render();
 }
 load();
 setInterval(load, 5 * 60e3);

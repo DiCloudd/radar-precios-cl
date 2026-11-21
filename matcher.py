@@ -32,7 +32,24 @@ def _ascii(s: str) -> str:
     return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
 
 
-def group_key(name: str, brand: str | None = None) -> str:
+_CODE = re.compile(r"\b(?=[a-z0-9-]*\d)(?=[a-z0-9-]*[a-z])[a-z0-9]+(?:-[a-z0-9]+)*\b")
+_NOT_CODE = re.compile(r"^(\d+(gb|tb|hz|w|mah|mp|cm|k|pulgadas)|\d+x\d+|ps\d|4k|8k|5g|4g|wifi\d*|usb\w*|"
+                       r"i[3579]|r[3579]|ddr\d|hdmi\d*|rtx\d+|gtx\d+|\d+(th|gen)|core\w*|ultra\d*)$")
+
+
+def model_code(name: str) -> str | None:
+    """Código de modelo (UN55DU7000, 82X1004GLM, CFI-2015): el identificador más fiable en TV, notebooks y consolas."""
+    cands = [t for t in _CODE.findall(_ascii(name or "").lower()) if len(t) >= 6 and not _NOT_CODE.match(t)]
+    return max(cands, key=len) if cands else None
+
+
+def group_key(name: str, brand: str | None = None, category: str = "celulares") -> str:
+    if category != "celulares":
+        code = model_code(name)
+        words = _ascii(name or "").lower().split()
+        if code:
+            return code                                       # el código ya es único; la marca varía entre tiendas
+        return f"{category}: " + " ".join(words[:6])          # sin código de modelo -> no comparable
     raw = _ascii(name or "").lower()
     refurb = bool(REFURB.search(raw))
     raw = re.sub(r"(?<=[a-z0-9])\+(?=\s|$|\d)", " plus ", raw)   # "Pro+ 512GB" -> "pro plus"
@@ -61,5 +78,11 @@ def group_key(name: str, brand: str | None = None) -> str:
 
 
 def comparable(key: str | None) -> bool:
-    """Solo se comparan entre tiendas los grupos con almacenamiento conocido (evita mezclar 128 GB con 512 GB)."""
-    return bool(key) and bool(re.search(r"\b\d+gb\b", key)) and len(key.split()) >= 3
+    """Se comparan entre tiendas: celulares con almacenamiento conocido (evita mezclar 128 GB con 512 GB)
+    y productos de otras categorías identificados por código de modelo ("samsung un55du7000gxzs")."""
+    if not key or ":" in key:
+        return False
+    if re.search(r"\b\d+gb\b", key) and len(key.split()) >= 3:
+        return True
+    parts = key.split()
+    return len(parts) <= 2 and bool(_CODE.fullmatch(parts[-1])) and len(parts[-1]) >= 6 and not _NOT_CODE.match(parts[-1])
