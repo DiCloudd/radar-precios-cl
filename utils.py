@@ -122,11 +122,11 @@ def ld_in_stock(item: dict) -> bool | None:
     if isinstance(offers, dict):
         offers = [offers]
     states = [str((o or {}).get("availability", "")) for o in offers if isinstance(o, dict)]
-    states = [s for s in states if s]
+    states = [s.lower() for s in states if s]       # Samsung usa "schema.org/inStock" (minúscula)
     if not states:
         return None
     # varias ofertas (colores/variantes): hay stock si CUALQUIERA lo tiene
-    return any("InStock" in s or "LimitedAvailability" in s or "PreOrder" in s for s in states)
+    return any("instock" in s or "limitedavailability" in s or "preorder" in s for s in states)
 
 
 def dedupe(products: list) -> list:

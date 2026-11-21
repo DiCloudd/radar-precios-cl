@@ -228,3 +228,4 @@ def test_stock_any_variant():
                                    {"availability": "https://schema.org/InStock"}]}) is True
     assert ld_in_stock({"offers": [{"availability": "https://schema.org/OutOfStock"}]}) is False
     assert ld_in_stock({"offers": []}) is None
+    assert ld_in_stock({"offers": {"availability": "https://schema.org/inStock"}}) is True   # Samsung
