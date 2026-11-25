@@ -11,16 +11,19 @@ from .pcfactory import PCFactoryScraper
 from .platforms import MacOnlineScraper, MotorolaScraper, MulticentroScraper, XiaomiScraper
 from .product_page import ProductPageScraper
 from .sfcc import AbcScraper, HitesScraper
+from .solotodo import LABELS as SOLOTODO_LABELS, SoloTodoScraper
 from .telcos import EntelScraper, MovistarScraper
 
 SCRAPERS: dict[str, type[Scraper]] = {
     cls.site: cls for cls in (
         FalabellaScraper, ParisScraper, PCFactoryScraper, LiderScraper, AbcScraper, HitesScraper,
         EntelScraper, MovistarScraper, SamsungScraper, AppleScraper, ProductPageScraper,
-        MotorolaScraper, XiaomiScraper, MacOnlineScraper, MulticentroScraper, LenovoScraper,
+        MotorolaScraper, XiaomiScraper, MacOnlineScraper, MulticentroScraper, LenovoScraper, SoloTodoScraper,
     )
 }
 
 SITE_LABELS = {k: v.label for k, v in SCRAPERS.items()}
+for _site, _label in SOLOTODO_LABELS.items():           # tiendas que llegan vía SoloTodo
+    SITE_LABELS.setdefault(_site, _label)
 
 __all__ = ["SCRAPERS", "SITE_LABELS", "FetchContext", "Scraper"]

@@ -31,7 +31,8 @@ CACHE_DAYS = 7
 # ids de tienda en SoloTodo (verificado nov-2026, /stores/?country=1)
 STORES = {"falabella": [9, 8147], "abc": [8015, 5, 30], "hites": [87], "pcfactory": [12], "lenovo": [199],
           "entel": [38, 181], "samsung": [223], "apple": [6365], "xiaomi": [8411, 6794], "paris": [11],
-          "lider": [43], "maconline": [], "motorola": [], "multicentro": []}
+          "lider": [43], "ripley": [18], "mercadolibre": [260], "tottus": [170],
+          "maconline": [], "motorola": [], "multicentro": []}
 _STOP = {"de", "con", "y", "el", "la", "para", "en", "gb", "ram", "ssd", "win", "11", "smart", "tv", "notebook", "gamer",
          "celular", "smartphone", "liberado", "negro", "blanco", "gris", "azul", "plata", "reacondicionado", "nuevo",
          "bluetooth", "wifi", "fi", "wi", "silver", "black", "white", "gray", "grey", "grafito", "monitor", "plano"}
@@ -97,12 +98,16 @@ class PriceChecker:
             return History(**cached["h"]) if cached.get("h") else None
         h = None
         try:
-            found = await self._find_product(p)
+            if ":st" in p.key:                  # vino de SoloTodo: ya sabemos su oferta exacta (sin buscar)
+                found, ents = (0, p.name), [{"id": int(p.key.split(":st", 1)[1])}]
+            else:
+                found, ents = await self._find_product(p), []
             if found:
                 pid, pname = found
-                ents = (await self._get("entities/", products=pid)).get("results", [])
-                stores = set(STORES.get(p.site) or [])
-                ents = sorted(ents, key=lambda e: (e["store"] not in stores, not e.get("active_registry")))[:3]
+                if not ents:
+                    ents = (await self._get("entities/", products=pid)).get("results", [])
+                    stores = set(STORES.get(p.site) or [])
+                    ents = sorted(ents, key=lambda e: (e["store"] not in stores, not e.get("active_registry")))[:3]
                 since = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
                 cut = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%d")
                 daily: dict[str, int] = {}

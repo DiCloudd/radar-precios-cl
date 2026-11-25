@@ -96,6 +96,9 @@ class Verifier:
         return pdp if pdp and pdp.found else await self.read_listing(p)
 
     async def verify(self, p: Product, delay: float | None = None) -> Verdict:
+        if ":st" in p.key:                       # 📚 vía SoloTodo: no podemos releer esa tienda desde la nube
+            return Verdict("unconfirmed", f"Visto vía SoloTodo ({p.stock_text or 'actualiza ~cada hora'}): "
+                                          "revisa en la tienda, puede haber cambiado")
         await asyncio.sleep(random.uniform(12, 20) if delay is None else delay)   # deja pasar un "parpadeo"
         lst, pdp = await asyncio.gather(self.read_listing(p), self.read_pdp(p))
         # ¿ya lo corrigieron?

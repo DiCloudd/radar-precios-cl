@@ -184,7 +184,8 @@ footer{margin-top:30px;color:var(--muted);font-size:12.5px;text-align:center}
   </div>
 
   <main id="view"></main>
-  <footer>Datos públicos de cada tienda, respetando su robots.txt. Precios en CLP. Actualizado automáticamente. · <span id="runner"></span></footer>
+  <footer>Datos públicos de cada tienda, respetando su robots.txt. Ripley, Paris, Lider, MercadoLibre y Tottus vía
+    <a href="https://www.solotodo.cl" target="_blank" rel="noopener">SoloTodo</a> 📚 (pueden tener ~1 h de desfase). Precios en CLP. Actualizado automáticamente. · <span id="runner"></span></footer>
 </div>
 
 <dialog id="dlg"><div class="dlg" id="dlgbody"></div></dialog>
@@ -246,6 +247,7 @@ function tags(p) {
   if (p.cuotas) t += `<span class="tag">${p.cuotas} cuotas</span>`;
   if (p.fake) t += `<span class="tag fake" title="${esc(p.fake)}">🤡 sospechosa</span>`;
   if (p.stock === false) t += `<span class="tag up">agotado</span>`;
+  if ((p.badges || []).includes("vía SoloTodo")) t += `<span class="tag" title="${esc(p.stockText || "")}: precio informado por SoloTodo, puede tener desfase">📚 ${esc((p.stockText || "vía SoloTodo").replace("vía SoloTodo · ", ""))}</span>`;
   return t;
 }
 

@@ -18,7 +18,7 @@
 #  (máx. ~4 por dominio, separadas ≥4 s). Si agregas fuentes "fast", hazlo con moderación.
 #
 #  Tiendas descartadas (verificado nov-2026, desde IPs de la nube):
-#     Ripley        -> 403 "Blocked" / captcha
+#     Ripley        -> 403 "Blocked" / captcha (sus precios llegan vía SoloTodo, ver abajo)
 #     MercadoLibre  -> exige verificación de cuenta; su API pública responde 403
 #     La Polar      -> redirige a abc.cl (misma empresa), cubierta por "abc"
 #     Movistar      -> robots.txt prohíbe todo a bots que no sean buscadores
@@ -963,6 +963,101 @@ category = "electro"
 url = "https://www.samsung.com/cl/washers-and-dryers/all-washers-and-dryers/"
 max_pages = 1
 fast = false
+
+
+# ============================== 📚 VÍA SOLOTODO (tiendas que bloquean a la nube) ===============
+#  Ripley, Paris, Lider, MercadoLibre y Tottus bloquean las IPs de GitHub. SoloTodo (api.solotodo.com, API pública)
+#  publica sus precios con ~1 h de desfase. Se lee 1 vez por hora (min_interval) para no abusar de su servicio.
+
+[[source]]
+name = "SoloTodo · Celulares"
+site = "solotodo"
+category = "celulares"
+url = "https://api.solotodo.com/entities/?categories=6&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Notebooks"
+site = "solotodo"
+category = "notebooks"
+url = "https://api.solotodo.com/entities/?categories=1&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Televisores"
+site = "solotodo"
+category = "televisores"
+url = "https://api.solotodo.com/entities/?categories=11&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Consolas"
+site = "solotodo"
+category = "consolas"
+url = "https://api.solotodo.com/entities/?categories=33&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Tablets"
+site = "solotodo"
+category = "tablets"
+url = "https://api.solotodo.com/entities/?categories=14&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Audífonos"
+site = "solotodo"
+category = "audifonos"
+url = "https://api.solotodo.com/entities/?categories=50&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Smartwatches"
+site = "solotodo"
+category = "smartwatches"
+url = "https://api.solotodo.com/entities/?categories=48&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Monitores"
+site = "solotodo"
+category = "monitores"
+url = "https://api.solotodo.com/entities/?categories=4&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Refrigeradores"
+site = "solotodo"
+category = "electro"
+url = "https://api.solotodo.com/entities/?categories=15&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
+
+[[source]]
+name = "SoloTodo · Lavadoras"
+site = "solotodo"
+category = "electro"
+url = "https://api.solotodo.com/entities/?categories=19&stores=18&stores=11&stores=43&stores=260&stores=170&is_available=1"
+max_pages = 10           # 200 ofertas por página
+fast = false
+min_interval = 3600
 
 # ============================================================================
 #  [[watch]]  productos individuales (página de producto). Se revisan en cada

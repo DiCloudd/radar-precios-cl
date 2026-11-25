@@ -20,6 +20,7 @@ from matcher import group_key
 from models import ScrapeResult
 from notifier import TelegramNotifier, chunk, format_alert
 from scrapers import SCRAPERS, SITE_LABELS, FetchContext
+from scrapers import solotodo
 import userprefs
 from storage import PriceStore, ago, now_iso
 from telegram_bot import alert_buttons
@@ -97,6 +98,10 @@ class Monitor:
             log.info("[%s] desbloqueada", res.source.site)
         return None
 
+    def _ran_recently(self, store: PriceStore, src: config.Source) -> bool:
+        last = next((r for r in store.recent_runs(src.name, 3) if r["ok"]), None)
+        return bool(last) and (datetime.now() - datetime.fromisoformat(last["ts"])).total_seconds() < src.min_interval
+
     # ------------------------------------------------------------------ vigilante de diseño
     def _layout_watch(self, store: PriceStore, res: ScrapeResult, mode: str) -> Alert | None:
         if res.skipped or res.blocked:
@@ -141,6 +146,8 @@ class Monitor:
                     continue                                  # solo profundo, o le toca en otro ciclo rápido
                 if mode == "deep" and self.crawling and src in self._crawled:
                     continue                                  # el rastreador ya recorre todas sus páginas
+                if src.min_interval and self._ran_recently(store, src):
+                    continue                                  # fuente lenta (SoloTodo): 1 lectura por intervalo
                 pause = self._paused(store, src)
                 if pause:
                     skipped.append(ScrapeResult(src, skipped=pause))
@@ -209,6 +216,8 @@ class Monitor:
 
     async def dispatch(self, store: PriceStore, alerts: list[Alert], ts: str, report: CycleReport | None = None) -> list[Alert]:
         """Deduplica (enfriamiento + silencios), registra y notifica. Devuelve las alertas efectivamente nuevas."""
+        # 📚 precios vía SoloTodo con más de 24 h: sirven para comparar, no para avisar (la tienda pudo cambiarlos)
+        alerts = [a for a in alerts if not (a.obs and getattr(a.obs.product, "age_h", 0) > solotodo.ALERT_MAX_AGE_H)]
         alerts = await self._vet(store, alerts)
         fresh = []
         for a in sorted(alerts, key=lambda a: a.priority):
@@ -296,7 +305,7 @@ class Monitor:
                 continue
             title, _, rest = text.partition("\n")
             self.notifier.send_animation(godzilla.asset(), f"{title}\n{v.line}\n{rest}", buttons(a))
-            if self.hunting and len(self.hunts) < MAX_HUNTS:      # 🎯 modo caza
+            if self.hunting and len(self.hunts) < MAX_HUNTS and ":st" not in p.key:   # 🎯 modo caza
                 task = asyncio.create_task(self.verifier.hunt(p, eid, a.ref, self.notifier.send))
                 self.hunts.add(task)
                 task.add_done_callback(self.hunts.discard)
