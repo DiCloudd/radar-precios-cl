@@ -11,6 +11,7 @@ from pathlib import Path
 
 import config
 import godzilla
+import inflation
 from analysis import bargain_vs, fake_discount, family_key, ganga_ref_ok, predict
 from calendar_cl import active_event, upcoming
 from matcher import comparable
@@ -109,16 +110,20 @@ def build_data(store: PriceStore) -> dict:
 
     # 🤡 ranking de tiendas "chantas": descuentos inflados (necesita historial) + qué tanto abusan del precio tachado
     ranking = []
+    inflated = inflation.load(store)                        # 📈 casos "subió y bajó" / "antes inflado" / "falso mínimo"
+    infl_by = inflation.per_store(inflated)
     for site in sorted({p["site"] for p in products if not p["missing"]}):
         items = [p for p in products if p["site"] == site and not p["missing"]]
         listed = [p for p in items if p["disc"]]
         fakes = sum(1 for p in items if p["fake"])
         fake_share = fakes / len(items) if items else 0
         avg_disc = statistics.mean(p["disc"] for p in listed) if listed else 0
-        index = round(0.6 * min(100, fake_share * 400) + 0.4 * min(100, avg_disc * 2))
+        infl_share = infl_by.get(site, 0) / len(items) if items else 0
+        index = round(min(100, 0.5 * min(100, fake_share * 400) + 0.3 * min(100, avg_disc * 2)
+                          + 0.2 * min(100, infl_share * 2000)))
         ranking.append({"site": site, "store": SITE_LABELS.get(site, site), "products": len(items),
                         "tachado_pct": round(len(listed) / len(items) * 100) if items else 0,
-                        "avg_disc": round(avg_disc, 1), "fakes": fakes, "index": index})
+                        "avg_disc": round(avg_disc, 1), "fakes": fakes, "inflated": infl_by.get(site, 0), "index": index})
     ranking.sort(key=lambda r: -r["index"])
     history_days = 0
     first = store.conn.execute("SELECT MIN(ts) FROM prices").fetchone()[0]
@@ -138,6 +143,8 @@ def build_data(store: PriceStore) -> dict:
                      for e in upcoming()],
         "categories": config.CATEGORY_LABELS,
         "errors": errors, "hall": hall, "ranking": ranking, "historyDays": history_days,
+        "inflated": [{**e, "store": SITE_LABELS.get(e["site"], e["site"])} for e in inflated[:150]
+                     if not e["key"].startswith("url:")],
         "stores": stores, "products": products, "comparisons": comparisons[:300], "alerts": alerts,
         # 🚨 gangas agotadas que el radar relee seguido (aviso inmediato si vuelve el stock)
         "restock": [{"key": k, **{f: v.get(f) for f in ("name", "site", "price", "ref", "reason", "since", "url", "image")},

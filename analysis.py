@@ -396,14 +396,21 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
             alerts.append(Alert("price_error", obs, "💥 ¿ERROR DE PRECIO CON TARJETA?" if card else "💥 ¿ERROR DE PRECIO?",
                                 [reason], 0, p.list_price or (p.price if card else obs.previous)))
 
-    # 🦖 GODZILLA: caída brutal vs el máximo de las últimas 24 h
+    # precio "de siempre": el mínimo de los últimos 30 días ANTES de esta lectura. Si la tienda lo subió y luego lo
+    # "bajó" al precio de antes (auditado: Abc subió ~35 refrigeradores 15–70 % antes del Black Friday), no hay bajada.
+    base = None if obs.is_new else store.baseline_min(p.key, config.BASELINE_DAYS)
+
+    # 🦖 GODZILLA: caída brutal vs el máximo de las últimas 24 h… y también vs su precio de siempre
     if not obs.is_new:
         peak = store.max_price_since(p.key, ago(hours=24)) or obs.previous
+        real = (1 - p.price / base) * 100 if base else 0
         if (peak and peak >= config.GODZILLA_MIN_PEAK and not accessory
-                and p.price <= peak * (1 - config.GODZILLA_DROP_PCT / 100)):
+                and p.price <= peak * (1 - config.GODZILLA_DROP_PCT / 100) and real >= config.GODZILLA_REAL_PCT):
             drop = (1 - p.price / peak) * 100
-            alerts.append(Alert("godzilla", obs, "🦖🔥 ALERTA GODZILLA 🔥🦖",
-                                [f"Cayó <b>{drop:.0f}%</b> en 24 h (de {clp(peak)} a {clp(p.price)})"], 0, peak))
+            lines = [f"Cayó <b>{drop:.0f}%</b> en 24 h (de {clp(peak)} a {clp(p.price)})"]
+            if base and peak > base * 1.1:
+                lines.append(f"⚠️ Antes lo habían subido: su precio habitual era {clp(base)} (ahorro real -{real:.0f}%)")
+            alerts.append(Alert("godzilla", obs, "🦖🔥 ALERTA GODZILLA 🔥🦖", lines, 0, peak))
 
     # 💥 muy por debajo de lo que cuesta ESE modelo en el resto del catálogo (relativo: sirve para productos caros)
     if (obs.is_new or obs.direction == "down") and not accessory and not any(a.kind == "price_error" for a in alerts):
@@ -421,9 +428,15 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
             alerts.append(Alert("target", obs, "🎯 ¡PRECIO OBJETIVO!", [f"{t.label} ({clp(t.target_price)})"], 1))
             break
 
-    if is_real_historic_low(obs) and (abs(obs.pct) >= 1 if watched else notable_drop(obs, half=True)):
+    real_drop = obs.direction == "down" and (watched or real_vs(p.price, base))   # bajó bajo su precio de siempre
+    if (obs.direction == "down" and base and obs.previous and obs.previous > base * 1.1 and not real_vs(p.price, base)
+            and obs.previous >= config.DROP_ALERT_MIN_PRICE and not accessory):
+        import inflation                     # 📈 lo subieron y lo "bajaron" al precio de siempre
+        inflation.log(store, p, "subió y bajó", obs.previous, base, "historial",
+                      f"lo subieron a {clp(obs.previous)} y volvió a {clp(p.price)} (precio habitual {clp(base)})")
+    if is_real_historic_low(obs) and (abs(obs.pct) >= 1 if watched else notable_drop(obs)) and real_drop:
         alerts.append(Alert("historic_low", obs, "🏆 MÍNIMO HISTÓRICO", [f"Mínimo anterior: {clp(obs.historic_min)}"], 2))
-    elif obs.direction == "down" and (abs(obs.pct) >= config.MIN_CHANGE_PCT if watched else notable_drop(obs)):
+    elif obs.direction == "down" and (abs(obs.pct) >= config.MIN_CHANGE_PCT if watched else notable_drop(obs)) and real_drop:
         alerts.append(Alert("drop", obs, "📉 Bajó de precio", [], 3))
     elif obs.direction == "up" and config.NOTIFY_ON_RISE and abs(obs.pct) >= config.MIN_CHANGE_PCT:
         alerts.append(Alert("rise", obs, "📈 Subió de precio", [], 6))
@@ -440,6 +453,13 @@ def evaluate(obs: Observation, store: PriceStore, watched: bool,
     if watched and obs.was_missing:
         alerts.append(Alert("back", obs, "🔁 Volvió a aparecer en la tienda", [], 3))
     return alerts
+
+
+def real_vs(price: int, base: int | None) -> bool:
+    """¿El precio quedó de verdad bajo su precio de siempre (mínimo 30 días)? Mismos umbrales que notable_drop."""
+    if not base:
+        return True                          # sin historial de 30 días no se puede saber: no se bloquea
+    return (price < base * (1 - config.DROP_ALERT_PCT / 100) and base - price >= config.DROP_ALERT_MIN_SAVING)
 
 
 def notable_drop(obs: Observation, half: bool = False) -> bool:

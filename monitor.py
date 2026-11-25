@@ -10,6 +10,8 @@ from datetime import datetime
 
 import config
 import godzilla
+import inflation
+import pricecheck
 import restock
 from analysis import Alert, clp, evaluate, fake_discount, is_accessory
 from calendar_cl import active_event
@@ -53,6 +55,7 @@ class Monitor:
         self.notifier = TelegramNotifier(dry_run=dry_run)
         self.sem = asyncio.Semaphore(config.CONCURRENCY)
         self.verifier = Verifier(self.ctx)
+        self.checker = pricecheck.PriceChecker(self.ctx)   # 📚 segunda opinión (SoloTodo)
         self.hunting = hunting                  # modo caza solo en el modo 24/7 (necesita seguir vivo)
         self.hunts: set[asyncio.Task] = set()
         self.fast_count = 0                     # para rotar fuentes con fast_every > 1
@@ -206,6 +209,7 @@ class Monitor:
 
     async def dispatch(self, store: PriceStore, alerts: list[Alert], ts: str, report: CycleReport | None = None) -> list[Alert]:
         """Deduplica (enfriamiento + silencios), registra y notifica. Devuelve las alertas efectivamente nuevas."""
+        alerts = await self._vet(store, alerts)
         fresh = []
         for a in sorted(alerts, key=lambda a: a.priority):
             dedupe_key = a.key or a.title
@@ -225,6 +229,43 @@ class Monitor:
         if fresh:
             await self._notify(fresh, report or CycleReport("crawl"), store)
         return [a for a, _ in fresh]
+
+    async def _vet(self, store: PriceStore, alerts: list[Alert]) -> list[Alert]:
+        """📚 Segunda opinión (historial de 90 días de SoloTodo) para mínimos históricos, bajadas y Godzilla:
+        descarta los "mínimos" que no lo son y los "antes" inflados, y deja anotado cada caso en 📈 inflados."""
+        out, checks = [], 0
+        for a in sorted(alerts, key=lambda a: a.priority):
+            if (a.kind not in ("historic_low", "drop", "godzilla") or not a.obs or checks >= pricecheck.CHECKS_PER_BATCH
+                    or store.alerted_recently(a.key, a.kind, a.price, config.ALERT_COOLDOWN_HOURS)):
+                out.append(a)
+                continue
+            checks += 1
+            h = await self.checker.history(store, a.obs.product)
+            if not h:
+                out.append(a)
+                continue
+            p = a.obs.product
+            claimed = a.ref if a.kind == "godzilla" else a.obs.previous
+            real = (1 - p.price / h.usual) * 100
+            when = f"{h.min_date[8:10]}-{h.min_date[5:7]}"
+            if a.kind == "historic_low" and p.price > h.min90:
+                inflation.log(store, p, "falso mínimo", claimed, h.min90, "solotodo",
+                              f"no es mínimo: estuvo a {clp(h.min90)} el {when} (SoloTodo)")
+                log.info("Descartado 'mínimo histórico' de %s: estuvo a %s el %s", p.key, h.min90, when)
+                continue
+            inflated = bool(claimed and claimed > h.usual * 1.10)
+            if inflated:
+                inflation.log(store, p, "antes inflado", claimed, h.usual, "solotodo",
+                              f"anunciaba 'antes {clp(claimed)}', su precio habitual era {clp(h.usual)} (SoloTodo)")
+            need = config.GODZILLA_REAL_PCT if a.kind == "godzilla" else config.DROP_ALERT_PCT
+            if real < need:              # frente a su precio HABITUAL no ahorras lo suficiente: no vale el aviso
+                log.info("Descartado %s de %s: ahorro real %.0f%% vs habitual %s", a.kind, p.key, real, h.usual)
+                continue
+            if inflated:
+                a.lines.append(f"⚠️ El 'antes' estaba inflado: precio habitual {clp(h.usual)} → ahorro real -{real:.0f}%")
+            a.lines.append(f"📚 SoloTodo 90 días: habitual {clp(h.usual)} · mínimo {clp(h.min90)} ({when})")
+            out.append(a)
+        return out
 
     async def _notify(self, fresh: list[tuple[Alert, str]], report: CycleReport, store: PriceStore) -> None:
         def row_of(a: Alert):

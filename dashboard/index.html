@@ -418,13 +418,23 @@ const views = {
     const rk = D.ranking || [], days = D.historyDays || 0;
     const rows = rk.map((r, i) => `<tr><td>${i === 0 && r.index > 0 ? "🤡 " : ""}<b>${esc(r.store)}</b></td>
       <td class="num"><b>${r.index}</b>/100</td><td class="num">${r.tachado_pct}%</td><td class="num">${r.avg_disc}%</td>
-      <td class="num">${r.fakes}</td><td class="num">${r.products}</td></tr>`).join("");
+      <td class="num">${r.fakes}</td><td class="num">${r.inflated || 0}</td><td class="num">${r.products}</td></tr>`).join("");
+    const kind = {"subió y bajó": "📈 subió y bajó", "antes inflado": "🎈 'antes' inflado", "falso mínimo": "🏆✖ falso mínimo"};
+    const inf = (D.inflated || []).filter(e => !state.q || e.name.toLowerCase().includes(state.q.toLowerCase()));
+    const infRows = inf.map(e => `<tr data-k="${esc(e.key)}"><td><div class="store">${esc(e.store)} · ${new Date(e.ts).toLocaleDateString("es-CL")}</div>${esc(e.name)}</td>
+      <td>${kind[e.kind] || esc(e.kind)}</td><td class="num"><s>${clp(e.claimed)}</s><br><b>${clp(e.price)}</b></td>
+      <td class="num">${clp(e.usual)}</td><td class="sub">${esc(e.note)}${e.source === "solotodo" ? " · 📚" : ""}</td></tr>`).join("");
     const list = filtered().filter(p => p.fake);
     return `<h3 style="margin:4px 0 6px">🤡 Ranking de tiendas chantas</h3>
       <p class="sub">Índice = 60% ofertas con descuento inflado (detectadas con historial) + 40% descuento "tachado" promedio que anuncian.
       ${days < 7 ? `⏳ Llevamos ${days} día(s) de historial: el detector de descuentos inflados necesita ~7 días; por ahora pesa sobre todo el tachado.` : ""}</p>
-      <div class="tablewrap"><table><thead><tr><th>Tienda</th><th>Índice</th><th>Con tachado</th><th>Desc. anunciado</th><th>🤡 Inflados</th><th>Productos</th></tr></thead>
+      <div class="tablewrap"><table><thead><tr><th>Tienda</th><th>Índice</th><th>Con tachado</th><th>Desc. anunciado</th><th>🤡 Sospechosas</th><th>📈 Inflados 30 d</th><th>Productos</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
+      <h3 style="margin:20px 0 6px">📈 Precios inflados detectados (${inf.length})</h3>
+      <p class="sub">Tiendas que subieron un precio para después "bajarlo", anunciaron un "antes" que no cobraban o
+        un "mínimo histórico" que no lo era. Estos avisos NO se envían a Telegram. 📚 = confirmado con el historial de 90 días de SoloTodo.</p>
+      ${inf.length ? `<div class="tablewrap"><table><thead><tr><th>Producto</th><th>Qué hicieron</th><th>Anunciado / ahora</th><th>Precio habitual</th><th>Detalle</th></tr></thead><tbody>${infRows}</tbody></table></div>`
+        : `<div class="empty">Sin casos detectados todavía.</div>`}
       <h3 style="margin:20px 0 6px">Ofertas sospechosas</h3>
       ${list.length ? `<div class="grid">${list.map(cardHTML).join("")}</div>`
         : `<div class="empty">Ninguna oferta sospechosa todavía (necesita historial de varios días).</div>`}`;

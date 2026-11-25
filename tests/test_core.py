@@ -75,13 +75,13 @@ def test_godzilla(store):
 
 
 def test_historic_low_needs_history(store, monkeypatch):
-    monkeypatch.setattr(config, "MIN_HISTORY_HOURS", 72)
+    monkeypatch.setattr(config, "MIN_HISTORY_HOURS", 336)
     store.observe(P(100_000), "g", "src", ts(10))
     obs = store.observe(P(88_000), "g", "src", ts(0))
     kinds = [a.kind for a in evaluate(obs, store, watched=False)]
     assert "historic_low" not in kinds and "drop" in kinds          # solo 10 h de historia
-    store.observe(P(100_000, key="t:2"), "g", "src", ts(100))
-    obs = store.observe(P(95_000, key="t:2"), "g", "src", ts(0))
+    store.observe(P(100_000, key="t:2"), "g", "src", ts(400))          # 14+ días de historia y -12 %
+    obs = store.observe(P(88_000, key="t:2"), "g", "src", ts(0))
     assert "historic_low" in [a.kind for a in evaluate(obs, store, watched=False)]
 
 
@@ -171,3 +171,97 @@ def test_strap_is_accessory():
     assert is_accessory("Fabric Band Para Galaxy Watch9", "smartwatches")
     assert is_accessory("Correa Apple Watch 42mm", "smartwatches")
     assert not is_accessory("Samsung Galaxy Watch9 40mm Black", "smartwatches")
+
+
+# ---------------------------------------------------------------- 📈 precios inflados (Black Friday 2026, auditado)
+def _series(store, key, prices_hours):
+    obs = None
+    for price, h in prices_hours:
+        obs = store.observe(P(price, key=key), "g", "src", ts(h))
+    return obs
+
+
+def test_raise_then_lower_back_is_not_a_drop(store):
+    # Abc: refrigerador Hisense $169.990 -> sube a $289.990 -> "baja" a $169.990 (-41 %): NO es una bajada
+    obs = _series(store, "abc:1", [(169_990, 90), (289_990, 50), (169_990, 0)])
+    kinds = [a.kind for a in evaluate(obs, store, watched=False, targets=[])]
+    assert not {"drop", "historic_low", "godzilla"} & set(kinds)
+
+
+def test_real_drop_below_usual_price_still_alerts(store):
+    obs = _series(store, "f:1", [(500_000, 400), (500_000, 50), (420_000, 0)])
+    assert "historic_low" in [a.kind for a in evaluate(obs, store, watched=False, targets=[])]
+
+
+def test_godzilla_needs_real_fall_vs_usual_price(store):
+    obs = _series(store, "h:1", [(129_990, 300), (169_990, 30), (89_990, 0)])   # lavadora Sindelen
+    a = [x for x in evaluate(obs, store, watched=False, targets=[]) if x.kind == "godzilla"]
+    assert a and "habitual" in " ".join(a[0].lines)                          # avisa, pero con el ahorro REAL
+    obs = _series(store, "h:2", [(179_990, 300), (299_990, 30), (179_990, 0)])  # subió y volvió: sin Godzilla
+    assert "godzilla" not in [x.kind for x in evaluate(obs, store, watched=False, targets=[])]
+
+
+def test_short_history_is_not_historic_low(store):
+    obs = _series(store, "w:1", [(279_990, 90), (259_990, 0)])               # Watch8: 4 días de historia
+    assert "historic_low" not in [a.kind for a in evaluate(obs, store, watched=False, targets=[])]
+
+
+# ---------------------------------------------------------------- 📚 segunda opinión con SoloTodo (sin red: checker falso)
+import asyncio  # noqa: E402
+
+import inflation  # noqa: E402
+from analysis import Alert  # noqa: E402
+from pricecheck import History  # noqa: E402
+
+
+class _FakeChecker:
+    def __init__(self, h):
+        self.h = h
+
+    async def history(self, store, p):
+        return self.h
+
+
+def _vet(store, alert, h):
+    from monitor import Monitor
+    mon = Monitor.__new__(Monitor)
+    mon.checker = _FakeChecker(h)
+    return asyncio.run(mon._vet(store, [alert]))
+
+
+def _obs(store, key, before, now, name="Galaxy Watch8 40mm"):
+    store.observe(Product(key, "hites", name, "u", before), "g", "src", ts(400))
+    return store.observe(Product(key, "hites", name, "u", now), "g", "src", ts(0))
+
+
+def test_vet_discards_false_historic_low(store):
+    obs = _obs(store, "h:1", 279_990, 249_990)        # Watch8 Hites: en octubre estuvo a $179.990
+    out = _vet(store, Alert("historic_low", obs, "🏆", [], 2), History("Watch8", 239_990, 179_990, "2026-10-07"))
+    assert out == [] and inflation.load(store)[0]["kind"] == "falso mínimo"
+
+
+def test_vet_rewrites_inflated_before(store):
+    obs = _obs(store, "f:2", 169_990, 89_990, "Lavadora Sindelen LS-7100BL")
+    out = _vet(store, Alert("godzilla", obs, "🦖", [], 0, 169_990), History("Sindelen", 129_990, 125_990, "2026-11-03"))
+    assert out and any("inflado" in l and "habitual $129.990" in l for l in out[0].lines)
+    assert inflation.load(store)[0]["kind"] == "antes inflado"
+
+
+def test_vet_drops_small_real_saving(store):
+    obs = _obs(store, "h:3", 349_990, 309_990, "Galaxy Tab S10 Lite")   # -11 % "anunciado", -6 % real
+    assert _vet(store, Alert("drop", obs, "📉", [], 3), History("Tab", 329_990, 249_990, "2026-10-07")) == []
+
+
+def test_vet_keeps_alert_without_history(store):
+    obs = _obs(store, "h:4", 300_000, 200_000)
+    a = Alert("drop", obs, "📉", [], 3)
+    assert _vet(store, a, None) == [a]
+
+
+def test_daily_scan_logs_raise_and_lower(store):
+    for price, h in [(169_990, 200), (289_990, 100), (169_990, 10)]:
+        store.observe(Product("abc:9", "abc", "Refrigerador Hisense RB215NR", "u", price), "g", "src", ts(h))
+    for price, h in [(500_000, 200), (520_000, 100), (450_000, 10)]:                # bajada real: no es inflado
+        store.observe(Product("f:9", "falabella", "TV", "u", price), "g", "src", ts(h))
+    assert inflation.scan(store) == 1 and inflation.load(store)[0]["key"] == "abc:9"
+    assert inflation.scan(store) == 0                                              # 1 vez por semana

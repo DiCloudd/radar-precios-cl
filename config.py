@@ -50,7 +50,9 @@ DAILY_SUMMARY_HOUR = int(os.getenv("DAILY_SUMMARY_HOUR", "9"))      # hora Chile
 TIMEZONE = os.getenv("TZ_NAME", "America/Santiago")
 
 # ---------------------------------------------------------------- análisis
-MIN_HISTORY_HOURS = _float("MIN_HISTORY_HOURS", 72)   # antes de esto no hay "mínimo histórico"
+MIN_HISTORY_HOURS = _float("MIN_HISTORY_HOURS", 336)  # 14 días: con menos historia un "mínimo histórico" engaña
+BASELINE_DAYS = _float("BASELINE_DAYS", 30)            # "precio de siempre" = mínimo de los últimos 30 días
+GODZILLA_REAL_PCT = _float("GODZILLA_REAL_PCT", 30)    # 🦖 además debe quedar 30 %+ bajo su precio de siempre
 GODZILLA_DROP_PCT = _float("GODZILLA_DROP_PCT", 40)   # caída vs máximo 24 h
 GODZILLA_MIN_PEAK = _float("GODZILLA_MIN_PEAK", 50000) # 🦖 solo productos que valían ≥ $50.000 (no accesorios)
 ERROR_DISCOUNT_PCT = _float("ERROR_DISCOUNT_PCT", 70)  # 💥 descuento sobre el precio normal que huele a error

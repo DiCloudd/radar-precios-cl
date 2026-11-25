@@ -154,6 +154,21 @@ class PriceStore:
             args.append(since)
         return self.conn.execute(q + " ORDER BY ts", args).fetchall()
 
+    def baseline_min(self, key: str, days: float = 30) -> int | None:
+        """Precio MÍNIMO que tuvo en los últimos `days` días ANTES de la lectura actual (incluye el que regía al
+        empezar la ventana). Es la referencia honesta de "antes": si la tienda subió el precio y luego lo "bajó"
+        al de siempre, el mínimo previo es el precio de siempre y no hay bajada real."""
+        since = ago(days=days)
+        last_id = self.conn.execute("SELECT MAX(id) FROM prices WHERE key=?", (key,)).fetchone()[0]
+        if last_id is None:
+            return None
+        before = self.conn.execute("SELECT price FROM prices WHERE key=? AND ts<? ORDER BY ts DESC LIMIT 1",
+                                   (key, since)).fetchone()
+        inside = self.conn.execute("SELECT MIN(price) FROM prices WHERE key=? AND ts>=? AND id<?",
+                                   (key, since, last_id)).fetchone()[0]
+        vals = [v for v in ((before[0] if before else None), inside) if v]
+        return min(vals) if vals else None
+
     def max_price_since(self, key: str, since: str) -> int | None:
         """Precio máximo vigente en la ventana (incluye el precio que regía al inicio)."""
         before = self.conn.execute("SELECT price FROM prices WHERE key=? AND ts<? ORDER BY ts DESC LIMIT 1",

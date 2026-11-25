@@ -32,6 +32,7 @@ COMMANDS = [
     ("precio", "Buscar: /precio galaxy a57 · /precio notebook lenovo · /precio ps5"),
     ("top", "Mayores bajadas de las últimas 24 h"),
     ("errores", "🏆 Últimos errores de precio: cuánto duraron y cuánto ahorrabas"),
+    ("inflados", "📈 Precios inflados detectados (subieron para luego \"bajar\")"),
     ("comparar", "Mismo modelo en todas las tiendas: /comparar iphone 17"),
     ("grafico", "Gráfico del historial: /grafico iphone 17 256"),
     ("objetivo", "Avisar bajo un precio: /objetivo 350000 galaxy a57"),
@@ -200,6 +201,22 @@ class TelegramBot:
         for i, (r, pct) in enumerate(drops, 1):
             lines.append(f"{i}. <b>{clp(r['price'])}</b> ({pct:+.0f}%) {SITE_LABELS.get(r['site'])} — "
                          f"<a href=\"{html.escape(r['url'], quote=True)}\">{html.escape(r['name'][:55])}</a>")
+        await self.reply(chat, "\n".join(lines))
+
+    async def cmd_inflados(self, store, chat, arg):
+        import inflation
+        items = [e for e in inflation.load(store) if not e["key"].startswith("url:")][:15]
+        if not items:
+            return await self.reply(chat, "📈 Aún no detecto precios inflados. Te los muestro aquí apenas aparezcan.")
+        icons = {"subió y bajó": "📈", "antes inflado": "🎈", "falso mínimo": "🏆✖"}
+        per = inflation.per_store(inflation.load(store))
+        lines = ["📈 <b>Precios inflados detectados</b> (no se avisan como ofertas)",
+                 "Últimos 30 días: " + " · ".join(f"{SITE_LABELS.get(s, s)} {n}" for s, n in
+                                                  sorted(per.items(), key=lambda kv: -kv[1]))]
+        for e in items:
+            lines.append(f"{icons.get(e['kind'], '•')} <a href=\"{html.escape(e['url'], quote=True)}\">"
+                         f"{html.escape(e['name'][:50])}</a> · {SITE_LABELS.get(e['site'], e['site'])}\n"
+                         f"   {html.escape(e['note'])}{' 📚' if e['source'] == 'solotodo' else ''}")
         await self.reply(chat, "\n".join(lines))
 
     async def cmd_errores(self, store, chat, arg):

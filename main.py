@@ -145,6 +145,11 @@ async def run_loop(args) -> None:
         with PriceStore(config.DB_PATH) as store:
             store.close_stale_errors()
             M.recheck_errors(store)
+            import inflation                              # 📈 barrido diario de precios "subió y bajó"
+            today = time.strftime("%Y-%m-%d")
+            if store.get_meta("inflados:scan") != today:
+                log.info("📈 Precios inflados nuevos en el registro: %d", inflation.scan(store))
+                store.set_meta("inflados:scan", today)
     except Exception:  # noqa: BLE001
         log.exception("No se pudo revisar el salón de la fama")
     watcher = restock.RestockWatcher(mon)

@@ -162,7 +162,7 @@ def test_dashboard_hall_and_ranking(db):
     assert d["hall"]["count"] == 1 and d["hall"]["confirmed"] == 1 and d["hall"]["median_minutes"] == 7
     assert d["errors"][0]["disc"] == 95 and d["errors"][0]["saving"] == 570000
     abc = next(r for r in d["ranking"] if r["site"] == "abc")
-    assert abc["tachado_pct"] == 50 and abc["avg_disc"] == 50.0 and abc["index"] == 40
+    assert abc["tachado_pct"] == 50 and abc["avg_disc"] == 50.0 and abc["index"] == 30   # 30 % tachado + 20 % inflados
 
 
 def test_photo_falls_back_to_text(monkeypatch):
