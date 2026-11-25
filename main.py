@@ -154,6 +154,9 @@ async def run_loop(args) -> None:
         log.exception("No se pudo revisar el salón de la fama")
     watcher = restock.RestockWatcher(mon)
     watch_task = asyncio.create_task(watcher.run(bot_stop))   # 🚨 relee las gangas agotadas cada ~2 min
+    from backfill import Backfill
+    backfill = Backfill(mon)
+    bf_task = asyncio.create_task(backfill.run(bot_stop))     # 📚 importa el historial de 90 días de SoloTodo
     log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)
     try:
         while not stop.is_set():
@@ -200,12 +203,14 @@ async def run_loop(args) -> None:
                 pass
     finally:
         bot_stop.set()
-        for t in (bot_task, crawl_task, watch_task):
+        for t in (bot_task, crawl_task, watch_task, bf_task):
             if t:
                 t.cancel()
-        await asyncio.gather(*(t for t in (bot_task, crawl_task, watch_task) if t), return_exceptions=True)
+        await asyncio.gather(*(t for t in (bot_task, crawl_task, watch_task, bf_task) if t), return_exceptions=True)
         log.info("🔄 Rastreador: %d páginas, %d productos en esta ventana", crawler.pages_done, crawler.products_seen)
         log.info("🚨 Vigilancia de stock: %d relecturas en esta ventana", watcher.reads)
+        log.info("📚 Historial SoloTodo: %d peticiones, %d precios antiguos importados en esta ventana",
+                 backfill.requests, backfill.imported)
         await bot.aclose()
         await mon.aclose()
         if dirty:                      # nunca terminar con datos sin publicar (en Actions se perderían)

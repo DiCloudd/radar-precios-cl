@@ -65,3 +65,21 @@ def test_verifier_marks_solotodo_unconfirmed():
     p = Product("ripley:st1", "ripley", "x", "u", 1000, stock_text="vía SoloTodo · hace 2 h")
     v = asyncio.run(Verifier(None).verify(p, delay=0))
     assert v.status == "unconfirmed" and "SoloTodo" in v.note
+
+
+def test_backfill_imports_only_older_changes(tmp_path):
+    from backfill import _candidates, import_history
+    from models import Product
+    from storage import PriceStore
+    s = PriceStore(tmp_path / "b.db")
+    s.observe(Product("pcfactory:50677", "pcfactory", "Redmi 13C", "u", 99_990), "g", "src", "2026-11-20T10:00:00")
+    hist = [{"timestamp": f"2026-10-{d:02d}T12:00:00Z", "is_available": True, "normal_price": p, "offer_price": p}
+            for d, p in [(1, "119990.00"), (2, "119990.00"), (10, "109990.00"), (11, "109990.00")]]
+    hist.append({"timestamp": "2026-11-21T12:00:00Z", "is_available": True, "normal_price": "1.00", "offer_price": "1.00"})
+    assert import_history(s, "pcfactory:50677", hist) == 2                   # 2 cambios, nada posterior a nuestro 1er dato
+    assert [r[0] for r in s.conn.execute("SELECT price FROM prices ORDER BY ts")] == [119_990, 109_990, 99_990]
+    assert s.conn.execute("SELECT first_seen FROM products").fetchone()[0].startswith("2026-10-01")
+    assert _candidates("pcfactory", {"store": 12, "id": 1, "sku": "50677",
+                                     "external_url": "https://www.pcfactory.cl/producto/50677-xiaomi"})[0] == "pcfactory:50677"
+    assert _candidates("", {"store": 18, "id": 1377172, "sku": "x", "external_url": ""}) == ["ripley:st1377172"]
+    s.close()
