@@ -31,7 +31,7 @@ CACHE_DAYS = 7
 # ids de tienda en SoloTodo (verificado nov-2026, /stores/?country=1)
 STORES = {"falabella": [9, 8147], "abc": [8015, 5, 30], "hites": [87], "pcfactory": [12], "lenovo": [199],
           "entel": [38, 181], "samsung": [223], "apple": [6365], "xiaomi": [8411, 6794], "paris": [11],
-          "lider": [43], "ripley": [18], "mercadolibre": [260], "tottus": [170],
+          "lider": [43], "ripley": [18], "mercadolibre": [225, 195], "tottus": [170],
           "maconline": [], "motorola": [], "multicentro": []}
 _STOP = {"de", "con", "y", "el", "la", "para", "en", "gb", "ram", "ssd", "win", "11", "smart", "tv", "notebook", "gamer",
          "celular", "smartphone", "liberado", "negro", "blanco", "gris", "azul", "plata", "reacondicionado", "nuevo",

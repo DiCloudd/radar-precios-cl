@@ -35,7 +35,11 @@ _SANITY = {"televisores": re.compile(r"\btv\b|televisor|smart|led|oled|qled|\d{2
                                      r"\b(?=\w*\d)(?=\w*[a-z])\w{6,}\b", re.I)}   # o un código de modelo (QN55Q60D)
 # id de tienda en SoloTodo -> nuestro "site" (y etiqueta)
 STORES = {18: ("ripley", "Ripley"), 11: ("paris", "Paris"), 43: ("lider", "Lider"),
-          260: ("mercadolibre", "MercadoLibre"), 170: ("tottus", "Tottus")}
+          170: ("tottus", "Tottus"),
+          # MercadoLibre: SOLO tiendas oficiales de marca (la general 260 mezcla revendedores). Verificado nov-2026:
+          # SoloTodo solo tiene estas dos (no hay DJI oficial).
+          225: ("mercadolibre", "MercadoLibre"), 195: ("mercadolibre", "MercadoLibre")}
+OFFICIAL_ML = {225: "Samsung (tienda oficial)", 195: "LG (tienda oficial)"}
 LABELS = {site: label for site, label in STORES.values()}
 
 
@@ -80,8 +84,10 @@ class SoloTodoScraper(Scraper):
             if "Refurbished" in cond or "Used" in cond:
                 name += " (reacondicionado)"
             badges = [BADGE]
-            if site == "mercadolibre" or e.get("seller"):
-                badges.append(f"Vendedor: {e.get('seller') or 'MercadoLibre'}")   # marketplace: no es referencia
+            if e.get("store") in OFFICIAL_ML:
+                badges.append(f"🏷️ MercadoLibre · {OFFICIAL_ML[e['store']]}")
+            elif e.get("seller"):
+                badges.append(f"Vendedor: {e['seller']}")              # marketplace: no es referencia
             pics = e.get("picture_urls") or []
             p = Product(
                 f"{site}:st{e['id']}", site, name, e.get("external_url") or "", normal,

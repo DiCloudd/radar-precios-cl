@@ -38,11 +38,15 @@ def test_skips_plans_unknown_stores_unavailable_and_stale():
 
 
 def test_marketplace_and_refurb_flags():
-    res = parse(ent(5, 260, "Samsung Galaxy S25 (256 GB / Navy)", 599990),
-                ent(6, 11, "Apple iPhone 13 (128 GB / Black)", 399990, condition="https://schema.org/RefurbishedCondition"))
-    ml, refurb = res.products
-    assert any(b.startswith("Vendedor: ") for b in ml.badges)          # MercadoLibre no sirve de referencia
+    res = parse(ent(4, 260, "Samsung Galaxy S25 (256 GB / Navy)", 499990),       # MercadoLibre general: revendedores
+                ent(5, 225, "Samsung Galaxy S25 (256 GB / Navy)", 599990),       # tienda OFICIAL Samsung en ML
+                ent(6, 11, "Apple iPhone 13 (128 GB / Black)", 399990, condition="https://schema.org/RefurbishedCondition"),
+                ent(7, 18, "Apple iPhone 15 (128 GB / Black)", 699990, seller="Tienda X"))
+    ml, refurb, mkt = res.products
+    assert ml.site == "mercadolibre" and ml.price == 599990                     # solo la oficial entra
+    assert not any(b.startswith("Vendedor: ") for b in ml.badges) and any("oficial" in b for b in ml.badges)
     assert refurb.name.endswith("(reacondicionado)")
+    assert any(b.startswith("Vendedor: ") for b in mkt.badges)                 # vendedor externo: no es referencia
 
 
 def test_category_sanity_filters_accessories_and_miscategorized():
