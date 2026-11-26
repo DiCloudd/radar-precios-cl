@@ -7,6 +7,7 @@ import statistics
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
+from urllib.parse import urlsplit
 
 import config
 import godzilla
@@ -76,14 +77,22 @@ class Monitor:
         await self.ctx.browser.aclose()
 
     # ------------------------------------------------------------------ pausas por bloqueo
+    @staticmethod
+    def _block_key(src: config.Source) -> str:
+        """Pausa por tienda. Los productos vigilados (/seguir) comparten site="watch" pero son de tiendas distintas:
+        se pausan por dominio, así un 403 de Ripley no congela los vigilados de Falabella o Paris."""
+        if src.site == "watch":
+            return f"block:watch:{urlsplit(src.url).netloc.lower()}"
+        return f"block:{src.site}"
+
     def _paused(self, store: PriceStore, src: config.Source) -> str | None:
-        st = store.get_meta(f"block:{src.site}")
+        st = store.get_meta(self._block_key(src))
         if st and st.get("until", 0) > time.time():
             return f"pausada por bloqueo hasta {datetime.fromtimestamp(st['until']):%H:%M} (strike {st['strikes']})"
         return None
 
     def _update_breaker(self, store: PriceStore, res: ScrapeResult, ts: str) -> Alert | None:
-        k = f"block:{res.source.site}"
+        k = self._block_key(res.source)
         st = store.get_meta(k, {"strikes": 0, "until": 0})
         if res.blocked and not res.products:
             st["strikes"] += 1
@@ -92,7 +101,8 @@ class Monitor:
             store.set_meta(k, st)
             log.warning("[%s] BLOQUEO detectado -> pausa %d min", res.source.site, pause // 60)
             if st["strikes"] in (1, 3, 6):
-                return Alert("blocked", None, f"🚧 {SITE_LABELS.get(res.source.site)} está bloqueando",
+                who = urlsplit(res.source.url).netloc if res.source.site == "watch" else SITE_LABELS.get(res.source.site)
+                return Alert("blocked", None, f"🚧 {who} está bloqueando",
                              [f"Pausa automática de {pause // 60:.0f} min para no empeorar el bloqueo.",
                               f"Detalle: {res.error}"], 4)
         elif res.ok and st["strikes"]:

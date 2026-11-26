@@ -265,3 +265,34 @@ def test_daily_scan_logs_raise_and_lower(store):
         store.observe(Product("f:9", "falabella", "TV", "u", price), "g", "src", ts(h))
     assert inflation.scan(store) == 1 and inflation.load(store)[0]["key"] == "abc:9"
     assert inflation.scan(store) == 0                                              # 1 vez por semana
+
+
+def test_black_friday_starts_the_night_before():
+    from datetime import datetime as D
+
+    import calendar_cl as c
+    assert c.active_event(D(2026, 11, 26, 20, 59)) is None
+    assert c.active_event(D(2026, 11, 26, 21, 0)).name == "Black Friday"
+    assert c.active_event(D(2026, 11, 28, 3, 0)).name == "Black Friday"
+    assert c.active_event(D(2026, 12, 2, 0, 0)) is None
+
+
+def test_watch_block_is_per_domain():
+    import config
+    from monitor import Monitor
+    ripley = config.Source("x", "https://simple.ripley.cl/p/1", "watch")
+    fala = config.Source("y", "https://www.falabella.com/falabella-cl/product/2", "watch")
+    assert Monitor._block_key(ripley) != Monitor._block_key(fala)
+    assert Monitor._block_key(config.Source("z", "https://x", "paris")) == "block:paris"
+
+
+def test_bad_photo_host_falls_back_to_text_once(monkeypatch):
+    import notifier as N
+    n = N.TelegramNotifier(token="t", chat_id="c")
+    calls = []
+    monkeypatch.setattr(n, "_post", lambda m, d, files=None: calls.append(m) or m == "sendMessage")
+    monkeypatch.setattr(N.time, "sleep", lambda s: None)
+    N._BAD_IMAGE_HOSTS.clear()
+    assert n.send_photo("https://img.tienda.cl/a.jpg", "hola")
+    assert n.send_photo("https://img.tienda.cl/b.jpg", "hola")
+    assert calls == ["sendPhoto", "sendMessage", "sendMessage"]

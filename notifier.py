@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -13,6 +14,7 @@ import config
 from analysis import Alert, clp
 
 log = logging.getLogger("notifier")
+_BAD_IMAGE_HOSTS: set[str] = set()   # hosts de fotos que Telegram no logra descargar (se mandan como texto)
 TG_LIMIT = 4000
 
 
@@ -115,14 +117,19 @@ class TelegramNotifier:
         if not self.live:
             print(f"\n--- [consola] FOTO {image_url[:80]} + mensaje ---\n{caption}\n--- fin ---")
             return True
-        if not image_url.startswith("http") or len(caption) > 1024:
+        host = urlsplit(image_url).netloc
+        if not image_url.startswith("http") or len(caption) > 1024 or host in _BAD_IMAGE_HOSTS:
             return self.send(caption, buttons)
         data = {"chat_id": self.chat_id, "photo": image_url, "caption": caption, "parse_mode": "HTML"}
         if buttons:
             data["reply_markup"] = json.dumps(buttons)
-        ok = self._post("sendPhoto", data)
-        time.sleep(1.1)
-        return ok or self.send(caption, buttons)
+        if self._post("sendPhoto", data):
+            time.sleep(1.1)
+            return True
+        # Telegram no pudo bajar la foto (la tienda bloquea su servidor): en adelante ese host va directo a texto,
+        # así una ráfaga de errores de precio no pierde ~3 s por alerta reintentando fotos imposibles
+        _BAD_IMAGE_HOSTS.add(host)
+        return self.send(caption, buttons)
 
     def send_animation(self, gif: Path, caption: str, buttons: dict | None = None) -> bool:
         if not self.live:
