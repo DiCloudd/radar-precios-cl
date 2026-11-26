@@ -25,7 +25,7 @@ from storage import PriceStore
 log = logging.getLogger("pricecheck")
 
 API = "https://api.solotodo.com"
-ENABLED = config._bool("SOLOTODO_CHECK", True)
+ENABLED = config._bool("SOLOTODO_CHECK", True) and not config.NODE_MODE
 CHECKS_PER_BATCH = 6
 CACHE_DAYS = 7
 # ids de tienda en SoloTodo (verificado nov-2026, /stores/?country=1)

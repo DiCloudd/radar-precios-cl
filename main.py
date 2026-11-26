@@ -84,6 +84,8 @@ async def run_once(args) -> int:
 
 def _build_and_publish(publish: bool, essential: bool = True) -> bool:
     """essential=False (publicación periódica dentro de la ventana) respeta el cupo de builds/hora de Pages."""
+    if config.NODE_MODE:                 # el nodo de este PC nunca publica: sube sus datos con node.py
+        return False
     import maintenance as M
     from dashboard import build_site
     from publisher import publish as do_publish
@@ -121,6 +123,7 @@ async def run_loop(args) -> None:
     last_deep = 0.0
     last_pub = time.time()             # sin publicación inmediata: 1 a mitad de ventana + 1 final (≤ ~9 builds/h)
     dirty = False                      # hay datos nuevos sin publicar
+    last_node = 0.0                    # última integración del nodo de Chile
     deadline = time.time() + args.duration * 60 if args.duration else None
     from telegram_bot import TelegramBot
     bot, bot_stop = TelegramBot(), asyncio.Event()
@@ -173,6 +176,10 @@ async def run_loop(args) -> None:
                 rep = await mon.cycle(mode)
                 dirty = True
                 print_report(rep)
+                if not config.NODE_MODE and time.time() - last_node >= 300:   # 🇨🇱 datos del nodo de Chile
+                    last_node = time.time()
+                    import node
+                    await node.import_into(mon)
                 with PriceStore(config.DB_PATH) as store:        # 🔥 gangas que la app ya muestra -> Telegram
                     pend = restock.pending_from_app(store)
                     if pend:

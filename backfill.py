@@ -52,6 +52,8 @@ class Backfill:
         return await self.mon.ctx.http.get(url, accept="application/json", as_json=True, retries=2)
 
     async def run(self, stop: asyncio.Event) -> None:
+        if config.NODE_MODE:
+            return                                    # el nodo de Chile no importa historial (lo hace la nube)
         try:
             while not stop.is_set():
                 with PriceStore(config.DB_PATH) as store:

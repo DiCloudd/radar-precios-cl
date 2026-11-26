@@ -62,6 +62,7 @@ class Monitor:
         self.fast_count = 0                     # para rotar fuentes con fast_every > 1
         self.crawling = False                   # True si el rastreador de catálogo completo está activo
         self.cycle_busy = False                 # True mientras un ciclo scrapea
+        self.node_sites: set[str] = set()       # 🇨🇱 tiendas que hoy trae el nodo de Chile (la nube no las intenta)
         from crawler import crawl_sources
         self._crawled = {s for srcs in crawl_sources(config.SOURCES).values() for s in srcs}
 
@@ -146,6 +147,8 @@ class Monitor:
                     continue                                  # solo profundo, o le toca en otro ciclo rápido
                 if mode == "deep" and self.crawling and src in self._crawled:
                     continue                                  # el rastreador ya recorre todas sus páginas
+                if src.site in self.node_sites and not config.NODE_MODE:
+                    continue                                  # 🇨🇱 la lee el nodo de Chile (aquí está bloqueada)
                 if src.min_interval and self._ran_recently(store, src):
                     continue                                  # fuente lenta (SoloTodo): 1 lectura por intervalo
                 pause = self._paused(store, src)

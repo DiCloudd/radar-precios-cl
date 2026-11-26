@@ -157,6 +157,11 @@ def _load() -> tuple[list[Source], list[Watch], list[Target]]:
 
 
 SOURCES, WATCHES, TARGETS = _load()
+# 🇨🇱 Nodo en este PC (node.py): solo lee las tiendas que bloquean a la nube, no publica ni envía mensajes
+NODE_MODE = _bool("NODE_MODE", False)
+NODE_SITES = {s.strip() for s in os.getenv("NODE_SITES", "paris").split(",") if s.strip()}
+if NODE_MODE:
+    SOURCES = [s for s in SOURCES if s.site in NODE_SITES]
 
 CATEGORY_LABELS = {"celulares": "📱 Celulares", "notebooks": "💻 Notebooks", "televisores": "📺 Televisores",
                    "consolas": "🎮 Consolas", "tablets": "📲 Tablets", "audifonos": "🎧 Audífonos",
