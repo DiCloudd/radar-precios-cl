@@ -12,6 +12,7 @@ import config
 import godzilla
 import inflation
 import pricecheck
+import priority
 import restock
 from analysis import Alert, clp, evaluate, fake_discount, is_accessory
 from calendar_cl import active_event
@@ -210,6 +211,8 @@ class Monitor:
             found = [] if quiet else evaluate(obs, store, _is_watched(p.key, p.name, p.site, targets), targets, cat)
             # 🔥 gangas / 🚨 reposición (en silencio en el 1er barrido: solo se anotan para vigilarlas)
             extra = restock.check(store, obs, gk, cat, src, watch, quiet=quiet)
+            if not quiet and not any(a.kind == "price_error" for a in found):    # ⭐ productos prioritarios
+                extra += priority.check(store, obs, cat)
             if any(a.kind in ("price_error", "godzilla") for a in found):
                 extra = [a for a in extra if a.kind != "ganga"]        # ya sale como error de precio
             alerts.extend(found + extra)
@@ -228,7 +231,7 @@ class Monitor:
             if store.alerted_recently(dedupe_key, a.kind, a.price, config.ALERT_COOLDOWN_HOURS):
                 continue
             # errores, Godzilla y gangas: 1 aviso por semana salvo que baje MÁS (anoche: el mismo Godzilla 2 veces)
-            if a.key and a.kind in ("godzilla", "price_error", "ganga", "restock_watch") and \
+            if a.key and a.kind in ("godzilla", "price_error", "ganga", "restock_watch", "priority") and \
                     store.alerted_at_or_below(a.key, a.kind, a.price, 7):
                 continue
             if a.kind not in ("godzilla", "price_error") and userprefs.is_muted(store, a.key):
@@ -288,7 +291,7 @@ class Monitor:
             return alert_buttons(row[0]) if row else None
 
         big = [(a, t) for a, t in fresh if a.kind in ("godzilla", "price_error") and a.obs]
-        urgent = [(a, t) for a, t in fresh if a.kind in ("restock", "ganga", "restock_watch") and (a, t) not in big]
+        urgent = [(a, t) for a, t in fresh if a.kind in ("restock", "ganga", "restock_watch", "priority") and (a, t) not in big]
         normal = [(a, t) for a, t in fresh if (a, t) not in big and (a, t) not in urgent]
 
         # 🚨🔥 reposición de gangas y gangas: siempre al instante, una por mensaje con foto (nunca agrupadas)

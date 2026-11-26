@@ -35,6 +35,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       DB_KEY: ${{ secrets.DB_KEY }}         # 🔐 cifra/descifra el respaldo público de la BD
+      PRIORITY_JSON: ${{ secrets.PRIORITY_JSON }}   # ⭐ productos prioritarios (privado)
       BROWSER_FALLBACK: "false"
       PUBLISH_INTERVAL: "360"      # 1 publicación a mitad de ventana + la final: ≤ ~9 builds/h (límite blando de Pages: 10)
     steps:

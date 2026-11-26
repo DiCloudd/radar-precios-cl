@@ -133,7 +133,7 @@ def build_data(store: PriceStore) -> dict:
     alerts = [dict(r) for r in store.conn.execute(
         "SELECT ts, key, kind, price, message FROM alerts "
         # 🙈 privado: objetivos, stock y desaparecidos de lo que TÚ vigilas no van al feed público
-        "WHERE kind NOT IN ('target', 'stock_out', 'stock_back', 'missing', 'back') AND key NOT LIKE 'url:%' "
+        "WHERE kind NOT IN ('target', 'stock_out', 'stock_back', 'missing', 'back', 'priority') AND message NOT LIKE '%PRIORIDAD%' AND key NOT LIKE 'url:%' "
         "ORDER BY id DESC LIMIT 150")]
     ev = active_event()
     return {
