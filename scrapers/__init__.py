@@ -8,7 +8,7 @@ from .lenovo import LenovoScraper
 from .lider import LiderScraper
 from .paris import ParisScraper
 from .pcfactory import PCFactoryScraper
-from .platforms import MacOnlineScraper, MotorolaScraper, MulticentroScraper, XiaomiScraper
+from .platforms import AufbauScraper, MacOnlineScraper, MotorolaScraper, MulticentroScraper, SonyScraper, XiaomiScraper
 from .product_page import ProductPageScraper
 from .sfcc import AbcScraper, HitesScraper
 from .solotodo import LABELS as SOLOTODO_LABELS, SoloTodoScraper
@@ -19,6 +19,7 @@ SCRAPERS: dict[str, type[Scraper]] = {
         FalabellaScraper, ParisScraper, PCFactoryScraper, LiderScraper, AbcScraper, HitesScraper,
         EntelScraper, MovistarScraper, SamsungScraper, AppleScraper, ProductPageScraper,
         MotorolaScraper, XiaomiScraper, MacOnlineScraper, MulticentroScraper, LenovoScraper, SoloTodoScraper,
+        SonyScraper, AufbauScraper,
     )
 }
 

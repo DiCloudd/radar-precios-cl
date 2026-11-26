@@ -155,3 +155,34 @@ class MacOnlineScraper(Scraper):
             if slug not in best or p.price < best[slug].price:
                 best[slug] = p
         return PageResult(list(best.values()), "JSON-LD Product")
+
+
+# ---------------------------------------------------------------- 📷 tiendas de cámaras (reutilizan VTEX / Shopify)
+def _rebrand(res: PageResult, old: str, site: str, brand: str | None = None) -> PageResult:
+    for p in res.products:
+        p.key = p.key.replace(f"{old}:", f"{site}:", 1)
+        p.site = site
+        if old == "motorola":                                    # el extractor VTEX antepone "Motorola"
+            p.name = p.name.removeprefix("Motorola ").strip()
+            p.brand = brand or p.brand
+    return res
+
+
+class SonyScraper(MotorolaScraper):
+    """Sony Store Chile (VTEX, verificado nov-2026). URL = /api/catalog_system/pub/products/search?fq=C:/1/"""
+    site, label = "sony", "Sony Store"
+
+    def parse(self, text: str, url: str) -> PageResult:
+        res = _rebrand(super().parse(text, url), "motorola", self.site, "Sony")
+        for p in res.products:
+            if not p.name.lower().startswith("sony"):
+                p.name = f"Sony {p.name}"
+        return res
+
+
+class AufbauScraper(MulticentroScraper):
+    """Aufbau (ex Reifschneider, Shopify). URL = /collections/<colección>"""
+    site, label = "aufbau", "Aufbau"
+
+    def parse(self, text: str, url: str) -> PageResult:
+        return _rebrand(super().parse(text, url), "multicentro", self.site)

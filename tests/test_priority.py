@@ -48,3 +48,15 @@ def test_reference_from_catalog(tmp_path):
     priority._refs.clear()
     assert [a.kind for a in priority.check(s, obs, "celulares", PRI)] == ["priority"]                   # -27 % vs catálogo
     s.close()
+
+
+def test_sony_vtex_rebrand():
+    import json
+    from scrapers.platforms import SonyScraper
+    data = [{"productId": "2474", "productName": "Cámara híbrida full-frame a7 V (Solo body)", "brand": "Sony",
+             "link": "https://store.sony.cl/a7v/p", "items": [{"images": [{"imageUrl": "https://img/a7v.jpg"}],
+             "sellers": [{"commertialOffer": {"Price": 2569989, "ListPrice": 2899990, "IsAvailable": True,
+                                              "AvailableQuantity": 3, "Installments": []}}]}]}]
+    p = SonyScraper().parse(json.dumps(data), "https://store.sony.cl/api/x").products[0]
+    assert (p.key, p.site, p.price, p.list_price) == ("sony:2474", "sony", 2569989, 2899990)
+    assert p.name.startswith("Sony Cámara híbrida full-frame a7 V") and "Motorola" not in p.name

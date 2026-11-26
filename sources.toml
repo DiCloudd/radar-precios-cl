@@ -951,6 +951,38 @@ url = "https://www.pcfactory.cl/categoria/accion?categorias=619"
 max_pages = 1
 fast = false
 
+[[source]]
+name = "Sony Store · Cámaras"
+site = "sony"
+category = "camaras"
+url = "https://store.sony.cl/api/catalog_system/pub/products/search?fq=C:/1/"
+max_pages = 3            # 50 por página (API VTEX de su tienda)
+fast = false
+
+[[source]]
+name = "Sony Store · Videocámaras y Action Cam"
+site = "sony"
+category = "camaras"
+url = "https://store.sony.cl/api/catalog_system/pub/products/search?fq=C:/21/"
+max_pages = 2            # 50 por página (API VTEX de su tienda)
+fast = false
+
+[[source]]
+name = "Sony Store · Audífonos"
+site = "sony"
+category = "audifonos"
+url = "https://store.sony.cl/api/catalog_system/pub/products/search?fq=C:/25/28/"
+max_pages = 2            # 50 por página (API VTEX de su tienda)
+fast = false
+
+[[source]]
+name = "Aufbau · Drones y cámaras"
+site = "aufbau"
+category = "camaras"
+url = "https://aufbau.cl/collections/drones-y-camaras"
+max_pages = 1
+fast = false
+
 # ============================== 🖨️ IMPRESORAS 3D (B10) ============================
 
 [[source]]
