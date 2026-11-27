@@ -37,6 +37,8 @@ COMMANDS = [
     ("grafico", "Gráfico del historial: /grafico iphone 17 256"),
     ("objetivo", "Avisar bajo un precio: /objetivo 350000 galaxy a57"),
     ("objetivos", "Ver y borrar tus objetivos"),
+    ("prioridad", "⭐ Prioritario en TODAS las tiendas (bajadas y errores): /prioridad osmo pocket 4p"),
+    ("prioridades", "Ver y quitar tus prioritarios"),
     ("seguir", "Vigilar un producto por su link: /seguir https://..."),
     ("siguiendo", "Ver y dejar de seguir productos"),
     ("estado", "Salud de cada tienda"),
@@ -289,6 +291,43 @@ class TelegramBot:
     async def cmd_borrar(self, store, chat, arg):
         gone = userprefs.remove_target(store, int(arg) - 1) if arg.isdigit() else None
         await self.reply(chat, f"🗑️ Borrado: {html.escape(gone['label'])}" if gone else "Uso: /borrar <número> (ver /objetivos)")
+
+    async def cmd_prioridad(self, store, chat, arg):
+        import priority
+        tokens = arg.split()
+        price_tok = next((t for t in tokens if re.fullmatch(r"\$?[\d.]{5,}", t)), None)
+        words = " ".join(t for t in tokens if t != price_tok)
+        if not words.strip():
+            return await self.reply(chat, "Ejemplo: /prioridad osmo pocket 4p\n(opcional, su precio normal: "
+                                          "/prioridad 769990 osmo pocket 4p)")
+        item = priority.from_text(words, parse_price(price_tok) if price_tok else None)
+        items = [i for i in store.get_meta("tg:priority", []) if i.get("match") != item["match"]] + [item]
+        store.set_meta("tg:priority", items)
+        pr, first = priority._parse([item])[0], (item["label"].split() or [""])[0]
+        now = [r for r in store.conn.execute("SELECT name, price, site, category, badges FROM products WHERE "
+                                             "missing_since IS NULL AND LOWER(name) LIKE ?", (f"%{first}%",))
+               if pr.matches(r["name"]) and priority._eligible(r["name"], r["category"] or "",
+                                                               json.loads(r["badges"]) if r["badges"] else [])]
+        tail = (f"\n\n👀 Hoy lo veo en {len({r['site'] for r in now})} tienda(s); el más barato: "
+                f"<b>{clp(min(r['price'] for r in now))}</b>") if now else "\n\n(Aún no lo veo en el catálogo; te aviso apenas aparezca.)"
+        await self.reply(chat, f"⭐ Prioritario: <b>{html.escape(item['label'])}</b>\nTe aviso al instante en cualquier "
+                               f"tienda si baja de precio o hay un posible error.{tail}")
+
+    async def cmd_prioridades(self, store, chat, arg):
+        import priority
+        fixed = [f"• {html.escape(p.label)} <i>(lista privada)</i>" for p in priority.PRIORITIES]
+        mine = [f"{i}. {html.escape(p['label'])}" for i, p in enumerate(store.get_meta("tg:priority", []), 1)]
+        if not fixed and not mine:
+            return await self.reply(chat, "No tienes prioritarios. Agrega uno: /prioridad osmo pocket 4p")
+        await self.reply(chat, "⭐ <b>Prioritarios</b>\n" + "\n".join(mine + fixed) + ("\n\nQuitar: /quitar 1" if mine else ""))
+
+    async def cmd_quitar(self, store, chat, arg):
+        items = store.get_meta("tg:priority", [])
+        if not arg.isdigit() or not 0 < int(arg) <= len(items):
+            return await self.reply(chat, "Uso: /quitar <número> (ver /prioridades)")
+        gone = items.pop(int(arg) - 1)
+        store.set_meta("tg:priority", items)
+        await self.reply(chat, f"🗑️ Ya no es prioritario: {html.escape(gone['label'])}")
 
     async def cmd_seguir(self, store, chat, arg):
         if not re.match(r"^https?://\S+$", arg):

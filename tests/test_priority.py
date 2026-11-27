@@ -32,7 +32,8 @@ def test_ridiculous_price_and_error(tmp_path):
 
 
 def test_small_drop_and_exclusions(tmp_path):
-    assert _check(tmp_path, "DJI Osmo Pocket 4P Standard Combo", 769_990, 739_990) == []              # -4 %: normal
+    assert _check(tmp_path, "DJI Osmo Pocket 4P Standard Combo", 769_990, 759_990) == []              # -1 %: ruido
+    assert _check(tmp_path / "a", "DJI Osmo Pocket 4P Standard Combo", 769_990, 739_990) == ["priority"]  # -4 %: bajada
     assert _check(tmp_path / "b", "DJI Osmo Pocket 4P Creator Combo", 999_990, 600_000) == []          # excluido
     assert _check(tmp_path / "c", "Funda para DJI Osmo Pocket 4P", 29_990, 9_990) == []                 # accesorio
     assert _check(tmp_path / "d", "DJI Osmo Pocket 4P", 769_990, 500_000, badges=["Vendedor: X"]) == []  # revendedor
@@ -60,3 +61,17 @@ def test_sony_vtex_rebrand():
     p = SonyScraper().parse(json.dumps(data), "https://store.sony.cl/api/x").products[0]
     assert (p.key, p.site, p.price, p.list_price) == ("sony:2474", "sony", 2569989, 2899990)
     assert p.name.startswith("Sony Cámara híbrida full-frame a7 V") and "Motorola" not in p.name
+
+
+def test_priority_from_telegram_text_matches_all_variants(tmp_path):
+    item = priority.from_text("Osmo Pocket 4P")
+    pr = priority._parse([item])[0]
+    assert pr.matches("DJI Osmo Pocket 4P Creator Combo") and pr.matches("Cámara DJI Osmo Pocket 4 Pro")
+    assert not pr.matches("DJI Osmo Pocket 3")
+    s = PriceStore(tmp_path / "t.db")
+    s.set_meta("tg:priority", [item])
+    s.observe(Product("p:1", "paris", "DJI Osmo Pocket 4 Pro Creator Combo", "u", 999_990), "g", "src", ts(5))
+    obs = s.observe(Product("p:1", "paris", "DJI Osmo Pocket 4 Pro Creator Combo", "u", 949_990), "g", "src", ts(0))
+    kinds = [a.kind for a in priority.check(s, obs, "camaras")]            # sin referencia: igual avisa la bajada
+    s.close()
+    assert kinds == ["priority"]
