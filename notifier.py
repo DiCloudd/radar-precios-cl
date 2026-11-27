@@ -4,6 +4,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -63,6 +64,12 @@ def chunk(blocks: list[str], header: str) -> list[str]:
     return msgs
 
 
+def _plain(text: str) -> str:
+    """Texto sin etiquetas HTML (respaldo si Telegram rechaza el formato); conserva el link del producto."""
+    text = re.sub(r'<a href="([^"]*)">([^<]*)</a>', lambda m: f"{m.group(2)}: {html.unescape(m.group(1))}", text)
+    return html.unescape(re.sub(r"</?(b|i|s|u|code|pre|a)( [^>]*)?>", "", text))[:4096]
+
+
 class TelegramNotifier:
     def __init__(self, token: str = config.TELEGRAM_BOT_TOKEN, chat_id: str | None = None,
                  dry_run: bool = False) -> None:
@@ -109,6 +116,10 @@ class TelegramNotifier:
         if buttons:
             data["reply_markup"] = json.dumps(buttons)
         ok = self._post("sendMessage", data)
+        if not ok:   # 🛟 HTML roto (p.ej. un "<" sin escapar): mejor el aviso en texto plano que perderlo
+            data["text"] = _plain(text)
+            data.pop("parse_mode", None)
+            ok = self._post("sendMessage", data)
         time.sleep(1.1)  # ~1 msg/s por chat
         return ok
 

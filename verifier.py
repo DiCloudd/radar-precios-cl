@@ -53,7 +53,7 @@ class Verdict:
     @property
     def line(self) -> str:
         icon = {"confirmed": "✅", "unconfirmed": "⚠️", "corrected": "🛑"}[self.status]
-        return f"{icon} <b>{self.note}</b>"
+        return f"{icon} <b>{html.escape(self.note)}</b>"   # la nota trae texto de tiendas ("<1 h")
 
 
 def close(a: int | None, b: int) -> bool:
