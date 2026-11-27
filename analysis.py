@@ -20,6 +20,7 @@ class Alert:
     lines: list[str] = field(default_factory=list)
     priority: int = 5              # menor = más importante
     ref: int | None = None         # precio de referencia (para saber cuándo corrigieron un error)
+    st_followup: bool = False      # 📚 la opinión de SoloTodo va en un 2º mensaje (no retrasa el aviso)
 
     @property
     def key(self) -> str | None:
