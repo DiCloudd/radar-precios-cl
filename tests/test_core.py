@@ -296,3 +296,18 @@ def test_bad_photo_host_falls_back_to_text_once(monkeypatch):
     assert n.send_photo("https://img.tienda.cl/a.jpg", "hola")
     assert n.send_photo("https://img.tienda.cl/b.jpg", "hola")
     assert calls == ["sendPhoto", "sendMessage", "sendMessage"]
+
+
+def test_verdict_line_escapes_store_text():
+    from verifier import Verdict
+    assert "<1 h" not in Verdict("unconfirmed", "Visto vía SoloTodo (vía SoloTodo · <1 h)").line
+
+
+def test_broken_html_falls_back_to_plain_text(monkeypatch):
+    import notifier as N
+    n = N.TelegramNotifier(token="t", chat_id="c")
+    sent = []
+    monkeypatch.setattr(N.time, "sleep", lambda s: None)
+    monkeypatch.setattr(n, "_post", lambda m, d, files=None: sent.append(dict(d)) or "parse_mode" not in d)
+    assert n.send('<b>Error</b> <1 h\\n<a href="https://x.cl/p?a=1&amp;b=2">Ver producto</a>')
+    assert sent[-1]["text"] == "Error <1 h\\nVer producto: https://x.cl/p?a=1&b=2"

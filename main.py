@@ -169,6 +169,8 @@ async def run_loop(args) -> None:
             ev = active_event()
             speed = config.EVENT_SPEEDUP if ev else 1.0
             mode = "deep" if time.time() - last_deep >= config.DEEP_INTERVAL / speed else "fast"
+            if mode == "deep" and last_deep and deadline and deadline - time.time() < 420:
+                mode = "fast"      # un profundo (~4-5 min en eventos) haría pasar la ventana del límite del job
             if ev and mode == "deep":
                 log.info("🎉 Evento activo: %s (velocidad x%.1f)", ev.name, speed)
             t0 = time.time()
