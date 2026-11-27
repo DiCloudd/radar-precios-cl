@@ -55,6 +55,24 @@ def _norm(s: str) -> str:
     return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
 
 
+def _priority_rows(store: PriceStore, pr) -> list:
+    """Productos del catálogo que calzan con un prioritario (sin accesorios, reacondicionados ni revendedores)."""
+    import priority
+    first = (re.findall(r"[a-z0-9]{3,}", pr.match.pattern.lower()) or [""])[0]
+    rows = store.conn.execute("SELECT name, price, card_price, site, category, badges FROM products WHERE "
+                              "missing_since IS NULL AND LOWER(name) LIKE ?", (f"%{first}%",)).fetchall()
+    return sorted((r for r in rows if pr.matches(r["name"]) and priority._eligible(
+        r["name"], r["category"] or "", json.loads(r["badges"]) if r["badges"] else [])), key=lambda r: r["price"])
+
+
+def _priority_lines(rows, limit: int = 8) -> list[str]:
+    out = []
+    for r in rows[:limit]:
+        card = f" · 💳 {clp(r['card_price'])}" if r["card_price"] and r["card_price"] < r["price"] else ""
+        out.append(f"• <b>{clp(r['price'])}</b>{card} — {SITE_LABELS.get(r['site'], r['site'])}: {html.escape(r['name'][:55])}")
+    return out
+
+
 def alert_buttons(rowid: int) -> dict:
     return {"inline_keyboard": [[
         {"text": "📊 Historial", "callback_data": f"h:{rowid}"},
@@ -303,20 +321,19 @@ class TelegramBot:
         item = priority.from_text(words, parse_price(price_tok) if price_tok else None)
         items = [i for i in store.get_meta("tg:priority", []) if i.get("match") != item["match"]] + [item]
         store.set_meta("tg:priority", items)
-        pr, first = priority._parse([item])[0], (item["label"].split() or [""])[0]
-        now = [r for r in store.conn.execute("SELECT name, price, site, category, badges FROM products WHERE "
-                                             "missing_since IS NULL AND LOWER(name) LIKE ?", (f"%{first}%",))
-               if pr.matches(r["name"]) and priority._eligible(r["name"], r["category"] or "",
-                                                               json.loads(r["badges"]) if r["badges"] else [])]
-        tail = (f"\n\n👀 Hoy lo veo en {len({r['site'] for r in now})} tienda(s); el más barato: "
-                f"<b>{clp(min(r['price'] for r in now))}</b>") if now else "\n\n(Aún no lo veo en el catálogo; te aviso apenas aparezca.)"
+        rows = _priority_rows(store, priority._parse([item])[0])
+        tail = ("\n\n👀 <b>Hoy en el catálogo</b> (de menor a mayor):\n" + "\n".join(_priority_lines(rows))) if rows \
+            else "\n\n(Aún no lo veo en el catálogo; te aviso apenas aparezca.)"
         await self.reply(chat, f"⭐ Prioritario: <b>{html.escape(item['label'])}</b>\nTe aviso al instante en cualquier "
                                f"tienda si baja de precio o hay un posible error.{tail}")
 
     async def cmd_prioridades(self, store, chat, arg):
         import priority
         fixed = [f"• {html.escape(p.label)} <i>(lista privada)</i>" for p in priority.PRIORITIES]
-        mine = [f"{i}. {html.escape(p['label'])}" for i, p in enumerate(store.get_meta("tg:priority", []), 1)]
+        mine = []
+        for i, it in enumerate(store.get_meta("tg:priority", []), 1):
+            rows = _priority_rows(store, priority._parse([it])[0])
+            mine.append(f"{i}. <b>{html.escape(it['label'])}</b>" + ("\n" + "\n".join(_priority_lines(rows, 5)) if rows else ""))
         if not fixed and not mine:
             return await self.reply(chat, "No tienes prioritarios. Agrega uno: /prioridad osmo pocket 4p")
         await self.reply(chat, "⭐ <b>Prioritarios</b>\n" + "\n".join(mine + fixed) + ("\n\nQuitar: /quitar 1" if mine else ""))
