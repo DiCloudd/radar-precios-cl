@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import statistics
 import time
@@ -61,6 +62,7 @@ class Monitor:
         self.checker = pricecheck.PriceChecker(self.ctx)   # 📚 segunda opinión (SoloTodo)
         self.hunting = hunting                  # modo caza solo en el modo 24/7 (necesita seguir vivo)
         self.hunts: set[asyncio.Task] = set()
+        self.followups: set[asyncio.Task] = set()     # 📚 2º mensaje SoloTodo de los 🦖
         self.fast_count = 0                     # para rotar fuentes con fast_every > 1
         self.crawling = False                   # True si el rastreador de catálogo completo está activo
         self.cycle_busy = False                 # True mientras un ciclo scrapea
@@ -69,6 +71,8 @@ class Monitor:
         self._crawled = {s for srcs in crawl_sources(config.SOURCES).values() for s in srcs}
 
     async def aclose(self) -> None:
+        if self.followups:                      # 📚 que los 2º mensajes alcancen a salir (máx. 90 s)
+            await asyncio.wait(set(self.followups), timeout=90)
         for t in list(self.hunts):              # fin de ventana: cierra las cazas (quedan como "seguía activo")
             t.cancel()
         if self.hunts:
@@ -259,7 +263,18 @@ class Monitor:
         """📚 Segunda opinión (historial de 90 días de SoloTodo) para mínimos históricos, bajadas y Godzilla:
         descarta los "mínimos" que no lo son y los "antes" inflados, y deja anotado cada caso en 📈 inflados."""
         out, checks = [], 0
+        cached = getattr(self.checker, "cached", None)
         for a in sorted(alerts, key=lambda a: a.priority):
+            if a.kind in ("godzilla", "price_error") and a.obs and cached:
+                hit, h = cached(store, a.obs.product)
+                if not hit:          # 🦖 sin respuesta guardada: el aviso sale YA y SoloTodo llega en un 2º mensaje
+                    a.st_followup = True
+                    out.append(a)
+                    continue
+                if a.kind == "price_error":      # los errores nunca se descartan: solo se anota la opinión
+                    a.lines += pricecheck.summary_lines(a.obs.product.price, h, SITE_LABELS)
+                    out.append(a)
+                    continue
             if (a.kind not in ("historic_low", "drop", "godzilla") or not a.obs or checks >= pricecheck.CHECKS_PER_BATCH
                     or store.alerted_recently(a.key, a.kind, a.price, config.ALERT_COOLDOWN_HOURS)):
                 out.append(a)
@@ -288,9 +303,23 @@ class Monitor:
                 continue
             if inflated:
                 a.lines.append(f"⚠️ El 'antes' estaba inflado: precio habitual {clp(h.usual)} → ahorro real -{real:.0f}%")
-            a.lines.append(f"📚 SoloTodo 90 días: habitual {clp(h.usual)} · mínimo {clp(h.min90)} ({when})")
+            if a.kind == "godzilla":
+                a.lines += pricecheck.summary_lines(p.price, h, SITE_LABELS)
+            else:
+                a.lines.append(f"📚 SoloTodo 90 días: habitual {clp(h.usual)} · mínimo {clp(h.min90)} ({when})")
             out.append(a)
         return out
+
+    async def _solotodo_followup(self, p, buttons: dict | None = None) -> None:
+        """📚 Después del 🦖: precio de hoy en SoloTodo, habitual y mínimo de 90 días, y si es oferta real."""
+        try:
+            with PriceStore(config.DB_PATH) as store:
+                h = await self.checker.history(store, p)
+            body = pricecheck.summary_lines(p.price, h, SITE_LABELS)
+            self.notifier.send(f"📚 <b>SoloTodo</b> · {html.escape(p.name[:70])} · {SITE_LABELS.get(p.site, p.site)} "
+                               f"a <b>{clp(p.price)}</b>\n" + "\n".join(body), buttons)
+        except Exception:  # noqa: BLE001 - el 2º mensaje nunca debe romper nada
+            log.exception("Segunda opinión SoloTodo falló para %s", p.key)
 
     async def _notify(self, fresh: list[tuple[Alert, str]], report: CycleReport, store: PriceStore) -> None:
         def row_of(a: Alert):
@@ -321,6 +350,10 @@ class Monitor:
                 continue
             title, _, rest = text.partition("\n")
             self.notifier.send_animation(godzilla.asset(), f"{title}\n{v.line}\n{rest}", buttons(a))
+            if a.st_followup or a.kind == "price_error" and not any("SoloTodo" in l for l in a.lines):
+                t = asyncio.create_task(self._solotodo_followup(p, buttons(a)))      # 📚 2º mensaje: ¿es oferta de verdad?
+                self.followups.add(t)
+                t.add_done_callback(self.followups.discard)
             if self.hunting and len(self.hunts) < MAX_HUNTS and ":st" not in p.key:   # 🎯 modo caza
                 task = asyncio.create_task(self.verifier.hunt(p, eid, a.ref, self.notifier.send))
                 self.hunts.add(task)

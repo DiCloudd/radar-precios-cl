@@ -210,10 +210,19 @@ async def test_monitor_error_flow_end_to_end(db, monkeypatch):
         fresh = [(Alert("price_error", o1, "💥 ¿ERROR DE PRECIO?", ["x"], 0, 499990), "💥 ¿ERROR DE PRECIO?\nPS5"),
                  (Alert("price_error", o2, "💥 ¿ERROR DE PRECIO?", ["x"], 0, 599990), "💥 ¿ERROR DE PRECIO?\nXbox"),
                  (Alert("drop", o3, "📉 Bajó de precio", [], 3), "📉 Bajó de precio\nTV")]
+        from pricecheck import History
+
+        async def fake_history(store, p):
+            return History("PS5", 499_990, 449_990, "2026-10-01", 479_990, "paris")
+        monkeypatch.setattr(mon.checker, "history", fake_history)
+        monkeypatch.setattr(mon.checker, "cached", lambda store, p: (False, None))
         await mon._notify(fresh, CycleReport("fast"), s)
-        await asyncio.gather(*mon.hunts)
+        await asyncio.gather(*mon.hunts, *mon.followups)
         errs = {e["key"]: dict(e) for e in s.errors()}
     gifs = [t for kind, t, _ in sent if kind == "gif"]
+    texts = [t for kind, t, _ in sent if kind == "text"]
+    assert len(texts) == 1 and "SoloTodo hoy: $479.990" in texts[0] and "OFERTA REAL" in texts[0]   # 📚 2º mensaje
+    assert [k for k, *_ in sent].index("gif") < [k for k, *_ in sent].index("text")               # 🦖 sale primero
     assert len(gifs) == 1 and "✅" in gifs[0] and "PS5" in gifs[0]           # el corregido NO se avisa
     assert [k for k, *_ in sent].count("photo") == 1                          # la bajada va con foto
     assert all(b and b["inline_keyboard"] for _, _, b in sent)                # todos con botones 📊🎯🔕

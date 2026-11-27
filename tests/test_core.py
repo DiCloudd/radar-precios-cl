@@ -311,3 +311,29 @@ def test_broken_html_falls_back_to_plain_text(monkeypatch):
     monkeypatch.setattr(n, "_post", lambda m, d, files=None: sent.append(dict(d)) or "parse_mode" not in d)
     assert n.send('<b>Error</b> <1 h\\n<a href="https://x.cl/p?a=1&amp;b=2">Ver producto</a>')
     assert sent[-1]["text"] == "Error <1 h\\nVer producto: https://x.cl/p?a=1&b=2"
+
+
+def test_solotodo_verdict_lines():
+    import pricecheck as P
+    h = P.History("PS5", 500_000, 450_000, "2026-10-01", 470_000, "paris")
+    lines = P.summary_lines(440_000, h, {"paris": "Paris"})
+    assert lines[0] == "🛒 SoloTodo hoy: $470.000 en Paris" and "OFERTA REAL" in lines[-1]
+    assert "No es oferta" in P.summary_lines(520_000, h)[-2]
+    assert "uno más barato" in P.summary_lines(520_000, h)[-1]
+    assert "sin historial" in P.summary_lines(1, None)[0]
+
+
+def test_godzilla_without_cache_is_not_delayed(store):
+    from monitor import Monitor
+    mon = Monitor.__new__(Monitor)
+
+    class Checker:
+        def cached(self, store, p):
+            return False, None
+
+        async def history(self, store, p):
+            raise AssertionError("no debe ir a la red antes del aviso")
+    mon.checker = Checker()
+    obs = _obs(store, "g:1", 500_000, 99_990, "Consola PlayStation 5")
+    out = asyncio.run(mon._vet(store, [Alert("godzilla", obs, "🦖", [], 0, 500_000)]))
+    assert out and out[0].st_followup
