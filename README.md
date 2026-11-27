@@ -88,6 +88,7 @@ Ver todos los comandos: `python main.py --help`.
 | `/comparar iphone 17 256` | mismo modelo en todas las tiendas |
 | `/grafico iphone 17` | gráfico PNG del historial |
 | `/objetivo 350000 galaxy a57` · `/objetivos` · `/borrar 1` | precios objetivo |
+| `/prioridad osmo pocket 4p` · `/prioridades` · `/quitar 1` | ⭐ prioritario en todas las tiendas: aviso al instante si baja de precio o hay posible error |
 | `/seguir <link>` · `/siguiendo` · `/dejar 1` | vigilar un producto puntual (stock, desaparece, baja) |
 | `/estado` · `/resumen` | salud de tiendas · resumen del día |
 

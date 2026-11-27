@@ -53,11 +53,10 @@ def load() -> list[Priority]:
         items = json.loads(raw) if raw.strip() else []
     except json.JSONDecodeError:
         return []
-    return [Priority(i["label"], re.compile(i["match"], re.I), re.compile(i["exclude"], re.I) if i.get("exclude") else None,
-                     int(i["ref"]) if i.get("ref") else None) for i in items if i.get("match")]
+    return _parse(items)
 
 
-PRIORITIES = load()
+PRIORITIES: list[Priority] = []        # se carga al final del módulo
 _refs: dict[str, tuple[float, int | None]] = {}
 
 
@@ -84,9 +83,41 @@ def reference(store, pr: Priority) -> int | None:
     return ref
 
 
+def from_text(text: str, ref: int | None = None) -> dict:
+    """"/prioridad osmo pocket 4p" -> entrada flexible: las palabras en orden, "4p" también calza "4 Pro"."""
+    words = re.findall(r"[a-z0-9]+", _ascii(text).lower())
+    parts = []
+    for w in words:
+        m = re.fullmatch(r"(\d+)([a-z]+)", w)
+        parts.append(rf"{m.group(1)}\s*{re.escape(m.group(2))}" if m else re.escape(w))
+    return {"label": " ".join(words), "match": r".*?".join(parts), "ref": ref}
+
+
+def _parse(items) -> list[Priority]:
+    out = []
+    for i in items or []:
+        try:
+            if i.get("match"):
+                out.append(Priority(i["label"], re.compile(i["match"], re.I),
+                                    re.compile(i["exclude"], re.I) if i.get("exclude") else None,
+                                    int(i["ref"]) if i.get("ref") else None))
+        except (re.error, KeyError, ValueError):
+            continue
+    return out
+
+
+def all_priorities(store) -> list[Priority]:
+    """Los del secreto PRIORITY_JSON + los agregados desde Telegram (/prioridad, guardados en la BD cifrada)."""
+    try:
+        mine = store.get_meta("tg:priority", [])
+    except Exception:  # noqa: BLE001
+        mine = []
+    return PRIORITIES + _parse(mine)
+
+
 def check(store, obs, category: str, priorities: list[Priority] | None = None) -> list[Alert]:
     p = obs.product
-    pris = PRIORITIES if priorities is None else priorities
+    pris = all_priorities(store) if priorities is None else priorities
     if not pris or not (obs.is_new or obs.direction == "down" or (obs.was_in_stock is False and p.in_stock)):
         return []
     if not _eligible(p.name, category, p.badges) or p.in_stock is False:
@@ -95,13 +126,19 @@ def check(store, obs, category: str, priorities: list[Priority] | None = None) -
         if not pr.matches(p.name):
             continue
         ref = reference(store, pr)
-        if not ref:
-            return []
-        ratio = p.price / ref
-        save = f"{(1 - ratio) * 100:.0f}% bajo su precio de referencia ({clp(ref)})"
-        if ratio <= ERROR_RATIO:
-            return [Alert("price_error", obs, "💥⭐ PRIORIDAD: ¿ERROR DE PRECIO?", [f"⭐ {pr.label}", save], 0, ref)]
-        if ratio <= DEAL_RATIO:
-            return [Alert("priority", obs, "⭐🔥 PRIORIDAD: PRECIO MUY BAJO", [f"⭐ {pr.label}", save], 0, ref)]
+        if ref:
+            ratio = p.price / ref
+            save = f"{(1 - ratio) * 100:.0f}% bajo su precio de referencia ({clp(ref)})"
+            if ratio <= ERROR_RATIO:
+                return [Alert("price_error", obs, "💥⭐ PRIORIDAD: ¿ERROR DE PRECIO?", [f"⭐ {pr.label}", save], 0, ref)]
+            if ratio <= DEAL_RATIO:
+                return [Alert("priority", obs, "⭐🔥 PRIORIDAD: PRECIO MUY BAJO", [f"⭐ {pr.label}", save], 0, ref)]
+        # ⭐📉 cualquier bajada real de un prioritario (no solo las ridículas), en cualquier tienda
+        if obs.direction == "down" and -obs.pct >= config.MIN_CHANGE_PCT:
+            return [Alert("priority", obs, "⭐📉 PRIORIDAD: BAJÓ DE PRECIO",
+                          [f"⭐ {pr.label}", f"Bajó {-obs.pct:.0f}% (antes {clp(obs.previous)})"], 1, ref)]
         return []
     return []
+
+
+PRIORITIES = load()
