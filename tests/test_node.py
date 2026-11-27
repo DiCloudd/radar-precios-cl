@@ -28,9 +28,12 @@ def test_export_import_roundtrip(tmp_path, monkeypatch):
     with PriceStore(cloud) as s:
         assert s.conn.execute("SELECT price FROM products WHERE key='paris:1'").fetchone()[0] == 399_990
         assert s.recent_runs(src.name, 1)[0]["mode"] == "node"
-    assert asyncio.run(node.import_into(mon, data)) == 0                 # la misma foto no se integra 2 veces
+    fresh_mon = Monitor(dry_run=True)                                    # ventana nueva, misma foto del nodo:
+    assert asyncio.run(node.import_into(fresh_mon, data)) == 0            # no se integra 2 veces…
+    assert fresh_mon.node_sites == {"paris"}                              # …pero la nube igual no pide Paris (403)
+    asyncio.run(fresh_mon.aclose())
     old = dict(data, ts="2020-01-01T00:00:00")
-    assert asyncio.run(node.import_into(mon, old)) == 0                  # nodo apagado: datos viejos
+    assert asyncio.run(node.import_into(mon, old)) == 0 and mon.node_sites == set()   # nodo apagado: la nube reintenta
     asyncio.run(mon.aclose())
 
 
