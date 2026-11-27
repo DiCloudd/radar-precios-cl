@@ -160,6 +160,13 @@ async def run_loop(args) -> None:
     from backfill import Backfill
     backfill = Backfill(mon)
     bf_task = asyncio.create_task(backfill.run(bot_stop))     # 📚 importa el historial de 90 días de SoloTodo
+    if not config.NODE_MODE:          # 🇨🇱 antes del 1er ciclo: así la nube no intenta Paris (403) mientras el nodo la lee
+        try:
+            import node
+            await node.import_into(mon)
+            last_node = time.time()
+        except Exception:  # noqa: BLE001
+            log.exception("No se pudo integrar el nodo de Chile al inicio")
     log.info("🚀 Modo 24/7 iniciado (rápido cada %.0fs, profundo cada %.0fs)", config.FAST_INTERVAL, config.DEEP_INTERVAL)
     try:
         while not stop.is_set():

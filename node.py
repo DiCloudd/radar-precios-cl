@@ -61,10 +61,12 @@ async def import_into(mon, data: dict | None = None) -> int:
     if not data:
         return 0
     with PriceStore(config.DB_PATH) as store:
+        if datetime.fromisoformat(data["ts"]) < datetime.now() - timedelta(minutes=FRESH_MIN):
+            mon.node_sites = set()
+            return 0                                          # el nodo está apagado: datos viejos (la nube reintenta)
+        mon.node_sites = set(data.get("sites") or [])          # el nodo está vivo: la nube no pide esas tiendas (403)
         if store.get_meta("node:last_ts") == data["ts"]:
             return 0                                          # esa foto ya se integró
-        if datetime.fromisoformat(data["ts"]) < datetime.now() - timedelta(minutes=FRESH_MIN):
-            return 0                                          # el nodo está apagado: datos viejos
         sources = {s.name: s for s in config.SOURCES}
         by_src: dict[str, list] = {}
         for r in data["products"]:
