@@ -90,3 +90,18 @@ async def test_buttons_target_mute_and_chart(db):
 
 def test_chart_png_without_history():
     assert price_chart("Producto", "Tienda", [], 100000)[:4] == b"\x89PNG"
+
+
+def test_priority_listing_names_each_store(tmp_path):
+    import priority
+    from models import Product
+    from storage import PriceStore
+    from telegram_bot import _priority_lines, _priority_rows
+    s = PriceStore(tmp_path / "x.db")
+    s.observe(Product("a:1", "pcfactory", "Cámara DJI Osmo Pocket 4P Standard Combo", "u", 699_990), "g", "src", "2026-11-26T20:00:00")
+    s.observe(Product("b:1", "falabella", "Osmo Pocket 4P Vlog Combo", "u", 829_990, card_price=799_990), "g", "src", "2026-11-26T20:00:00")
+    s.observe(Product("c:1", "falabella", "Estuche Rígido Protector Para Dji Osmo Pocket 4p", "u", 49_990), "g", "src", "2026-11-26T20:00:00", "camaras")
+    lines = _priority_lines(_priority_rows(s, priority._parse([priority.from_text("osmo pocket 4p")])[0]))
+    s.close()
+    assert len(lines) == 2 and "PCFactory" in lines[0] and "$699.990" in lines[0]
+    assert "💳 $799.990" in lines[1] and "Vlog" in lines[1]
